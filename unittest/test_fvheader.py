@@ -1,10 +1,9 @@
 import pytest
 import uuid
-from DataStruct.FvHeader import *
+from PI.FvHeader import *
+from PI.Guid import *
 
 FvBuffers = [r"unittest\Ovmf.fd", r"unittest\PEIFV.fv"]
-
-zeroguid = uuid.UUID('{00000000-0000-0000-0000-000000000000}')
 
 
 class TestFvHeader():
@@ -21,12 +20,12 @@ class TestFvHeader():
         FvHSize = 0
         i = 0
         while i < len(buffer):
-            if buffer[i:i+4] == b'_FVH' and buffer[i-40:i-40+16] == zeroguid.bytes:
+            if buffer[i:i+4] == b'_FVH' and buffer[i-40:i-40+16] == ZeroGuid.bytes:
                 FvStart = i - 40
                 FvHSize = unpack("<H", buffer[i+8:i+10])[0]
                 fvheader = EFI_FIRMWARE_VOLUME_HEADER(
                     buffer[FvStart:FvStart+FvHSize])
-                assert(fvheader.ZeroVector == zeroguid.bytes)
+                assert(fvheader.ZeroVector == ZeroGuid.bytes)
                 print(fvheader.ExtHeaderOffset)
                 assert (fvheader.Encode() == buffer[FvStart:FvStart+FvHSize])
                 i += fvheader.FvLength
