@@ -26,8 +26,12 @@ class TestFvHeader():
                 fvheader = EFI_FIRMWARE_VOLUME_HEADER(
                     buffer[FvStart:FvStart+FvHSize])
                 assert(fvheader.ZeroVector == ZeroGuid.bytes)
-                print(fvheader.ExtHeaderOffset)
+                assert(fvheader.Signature == b'_FVH')
                 assert (fvheader.Encode() == buffer[FvStart:FvStart+FvHSize])
+                fsguid = uuid.UUID(bytes_le=fvheader.FileSystemGuid)
+                # assert (fsguid == EFI_FIRMWARE_FILE_SYSTEM2_GUID or fsguid ==
+                #        EFI_FIRMWARE_FILE_SYSTEM3_GUID)
+                print(FvStart, fsguid)
                 i += fvheader.FvLength
                 continue
             i += 1

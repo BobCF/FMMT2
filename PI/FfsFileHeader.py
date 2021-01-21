@@ -64,7 +64,7 @@ class EFI_FFS_FILE_HEADER2:
         (self.Type, self.Attributess) = unpack("<BB", buffer[18:20])
         self.Size = unpack("<BBB", buffer[20:23])
         self.State = unpack("<B", buffer[24])[0]
-        self.ExtendedSize = unpack("<Q", [25:])[0]
+        self.ExtendedSize = unpack("<Q", buffer[25:])[0]
 
     @property
     def FFS_FILE_SIZE(self):
