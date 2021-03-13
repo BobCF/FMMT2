@@ -32,6 +32,42 @@ parser.add_argument("--version", action="version", version='%(prog)s Version 1.0
 
 parser.add_argument("-r")
 
+class FMMT():
+    def __init__(self):
+        self.firmware_packet = None
+
+    def load(self, fv_file):
+        with open(fv_file, "rb") as fd:
+            buffer = fd.read()
+        self.firmware_packet = FirmwarePacket(buffer)
+        self.firmware_packet.unpack()
+
+    def insert(self, fvid, ffspath):
+        fv_node = self.firmware_packet.search(fvid)
+        Ffs_handler = FirmwareFile(fv_node)
+        with open(ffspath, 'rb') as fd:
+            ffsbuffer = fd.read()
+        ffs_node = FwNode(Ffs_handler.decode(ffsbuffer))
+        self.firmware_packet.insert(fv_node, ffs_node)
+        self.firmware_packet.flush()
+
+    def delete(self, fvid, ffsname):
+        fv_node = self.firmware_packet.search(fvid)
+        self.firmware_packet.delete(fv_node, ffsname)
+        self.firmware_packet.flush()
+
+    def update(self, fvid, oldffsname, newffspath):
+        fv_node = self.firmware_packet.search(fvid)
+        with open(newffspath, 'rb') as fd:
+            ffsbuffer = fd.read()
+        Ffs_handler = FirmwareFile(fv_node)
+        ffs_node = FwNode(Ffs_handler.decode(ffsbuffer))
+        self.firmware_packet.update(fv_node, oldffsname, ffs_node)
+        self.firmware_packet.flush()
+
+    def view(self):
+        self.firmware_packet.view()
+
 
 def main():
     args = parser.parse_args()
@@ -46,6 +82,8 @@ def main():
     logger.addHandler(lh)
 
     try:
+        fmmt = FMMT()
+        fmmt.load("OVMF.fd")
         # TODO:
         '''Do the main work'''
     except Exception as e:
