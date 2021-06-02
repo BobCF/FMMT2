@@ -6,7 +6,7 @@ import sys
 import tempfile
 import uuid
 
-from FMMT2.PI.SectionHeader import EFI_GUID_DEFINED_SECTION
+from PI.SectionHeader import EFI_GUID_DEFINED_SECTION
 
 
 logger = logging.getLogger("Section Type")
@@ -27,11 +27,11 @@ class GUIDTool:
     def pack(self, *args, **kwargs):
         pass
 
-    def unpack(self, buffer, guidTool):
+    def unpack(self, buffer):
         """
         buffer: remove common header
         """
-        tool = guidTool.command
+        tool = self.command
         if tool:
             tmp_dir = os.path.join(os.getcwd(), 'tmp')
             if not os.path.exists(tmp_dir):
@@ -59,7 +59,7 @@ class GUIDTool:
                 return res_buffer
         else:
             logger.error("Error parsing section: EFI_SECTION_GUID_DEFINED cannot be parsed at this time.")
-            logger.info("Its GUID is: %s" % guidTool.guid)
+            logger.info("Its GUID is: %s" % self.guid)
             return ""
 
 

@@ -40,6 +40,7 @@ class EFI_FFS_FILE_HEADER:
         self.State: int
         self.Decode(buffer)
         self.Name_uuid = uuid.UUID(bytes_le=self.Name)
+        self.HeaderLength: int
 
     def Decode(self, buffer):
         self.Name = unpack("<16s", buffer[:16])[0]
@@ -47,6 +48,7 @@ class EFI_FFS_FILE_HEADER:
         (self.Type, self.Attributes) = unpack("<BB", buffer[18:20])
         self.Size = unpack("<BBB", buffer[20:23])
         self.State = unpack("<B", buffer[23:24])[0]
+        self.HeaderLength = 24
 
     @property
     def FFS_FILE_SIZE(self):
@@ -55,10 +57,11 @@ class EFI_FFS_FILE_HEADER:
     def Encode(self) -> bytes:
         buff = b''
         buff += pack("<16s", self.Name)
-        buff += self.IntegrityCheck
+        buff += self.IntegrityCheck.Checksum16
         buff += pack("<BB", self.Type, self.Attributes)
-        buff += pack("<BBB", self.Size[0], self.Size[1].self.Size[2])
+        buff += pack("<BBB", self.Size[0], self.Size[1], self.Size[2])
         buff += pack("<B", self.State)
+        return buff
 
 
 class EFI_FFS_FILE_HEADER2:
@@ -73,6 +76,7 @@ class EFI_FFS_FILE_HEADER2:
         self.ExtendedSize: int
         self.Decode(buffer)
         self.Name_uuid = uuid.UUID(bytes_le=self.Name)
+        self.HeaderLength: int
 
     def Decode(self, buffer):
         self.Name = unpack("<16s", buffer[:16])[0]
@@ -81,6 +85,7 @@ class EFI_FFS_FILE_HEADER2:
         self.Size = unpack("<BBB", buffer[20:23])
         self.State = unpack("<B", buffer[23:24])[0]
         self.ExtendedSize = unpack("<Q", buffer[24:32])[0]
+        self.HeaderLength = 32
 
     @property
     def FFS_FILE_SIZE(self):
@@ -89,8 +94,9 @@ class EFI_FFS_FILE_HEADER2:
     def Encode(self) -> bytes:
         buff = b''
         buff += pack("<16s", self.Name)
-        buff += self.IntegrityCheck
+        buff += self.IntegrityCheck.Checksum16
         buff += pack("<BB", self.Type, self.Attributes)
-        buff += pack("<BBB", self.Size[0], self.Size[1].self.Size[2])
+        buff += pack("<BBB", self.Size[0], self.Size[1], self.Size[2])
         buff += pack("<B", self.State)
         buff += pack("<Q", self.ExtendedSize)
+        return buff
