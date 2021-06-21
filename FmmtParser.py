@@ -13,9 +13,11 @@ import uuid
 import copy
 
 EFI_FIRMWARE_FILE_SYSTEM2_GUID = uuid.UUID("8c8ce578-8a3d-4f1c-9935-896185c32dd3")
-EFI_FIRMWARE_FILE_SYSTEM2_GUID_BYTE = EFI_FIRMWARE_FILE_SYSTEM2_GUID.bytes
+EFI_FIRMWARE_FILE_SYSTEM2_GUID_BYTE = b'x\xe5\x8c\x8c=\x8a\x1cO\x995\x89a\x85\xc3-\xd3'
+# EFI_FIRMWARE_FILE_SYSTEM2_GUID_BYTE = EFI_FIRMWARE_FILE_SYSTEM2_GUID.bytes
 EFI_FIRMWARE_FILE_SYSTEM3_GUID = uuid.UUID("5473C07A-3DCB-4dca-BD6F-1E9689E7349A")
-EFI_FIRMWARE_FILE_SYSTEM3_GUID_BYTE = b'x\xe5\x8c\x8c=\x8a\x1cO\x995\x89a\x85\xc3-\xd3'
+# EFI_FIRMWARE_FILE_SYSTEM3_GUID_BYTE = b'x\xe5\x8c\x8c=\x8a\x1cO\x995\x89a\x85\xc3-\xd3'
+EFI_FIRMWARE_FILE_SYSTEM3_GUID_BYTE = b'z\xc0sT\xcb=\xcaM\xbdo\x1e\x96\x89\xe74\x9a'
 EFI_SYSTEM_NVDATA_FV_GUID = uuid.UUID("fff12b8d-7696-4c8b-a985-2747075b4f50")
 EFI_SYSTEM_NVDATA_FV_GUID_BYTE = b"\x8d+\xf1\xff\x96v\x8bL\xa9\x85'G\x07[OP"
 EFI_FFS_VOLUME_TOP_FILE_GUID = uuid.UUID("1ba0062e-c779-4582-8566-336ae8f78f09")
@@ -55,6 +57,10 @@ SectionHeaderType = {
 '''
 
 ROOT_TREE = 'ROOT'
+ROOT_FV_TREE = 'ROOT_FV_TREE'
+ROOT_FFS_TREE = 'ROOT_FFS_TREE'
+ROOT_SECTION_TREE = 'ROOT_SECTION_TREE'
+
 FV_TREE = 'FV'
 DATA_FV_TREE = 'DATA_FV'
 FFS_TREE = 'FFS'
@@ -114,12 +120,14 @@ class FfsNode:
 
 class SectionNode:
     def __init__(self, buffer: bytes):
-        if buffer[4:7] != b'\xff\xff\xff':
+        if buffer[0:3] != b'\xff\xff\xff':
             self.Header = EFI_COMMON_SECTION_HEADER(buffer)
         else:
             self.Header = EFI_COMMON_SECTION_HEADER2(buffer)
         if self.Header.Type in SectionHeaderType:
             self.Name = SectionHeaderType[self.Header.Type]
+        elif self.Header.Type == 0:
+            self.Name = "EFI_SECTION_RAW"
         else:
             self.Name = "SECTION"
         if self.Header.Type in HeaderType:
@@ -224,7 +232,7 @@ class NODETREE:
             return None
 
     def parserTree(self, TreeInfo, space =""):
-        if self.type == ROOT_TREE:
+        if self.type == ROOT_TREE or self.type == ROOT_FV_TREE or self.type == ROOT_FFS_TREE or self.type == ROOT_SECTION_TREE:
             print("Name:{}  Type:{}  FilesNum:{}".format(self.key, self.type, len(self.Child)))
             TreeInfo.append("Name:{}  Type:{}  FilesNum:{}".format(self.key, self.type, len(self.Child)))
         elif self is not None:
@@ -271,14 +279,14 @@ class FMMTParser:
         self.FinalData = b''
         self.Encapsulation(SectionTree, True)
         SectionTree.Data.Data = self.FinalData
-        guidtool = GUIDTools(r'C:\Users\yuweiche\Code\FMMT2\FMMTConfig.ini').__getitem__(GuidTool)
+        guidtool = GUIDTools(r'FMMTConfig.ini').__getitem__(GuidTool)
         # CompressedData = guidtool.pack(SectionTree.Data.Data)
         # SectionTree.Data.OriData = CompressedData
 
     ## Use GuidTool to decompress data.
     def DeCompressData(self, GuidTool, Section_Data):
         print('len_Section_Data', len(Section_Data))
-        guidtool = GUIDTools(r'C:\Users\yuweiche\Code\FMMT2\FMMTConfig.ini').__getitem__(GuidTool)
+        guidtool = GUIDTools(r'FMMTConfig.ini').__getitem__(GuidTool)
         print(guidtool)
         print(guidtool.command)
         DecompressedData = guidtool.unpack(Section_Data)
@@ -297,6 +305,7 @@ class FMMTParser:
             Section_Tree.Data.OriData = Section_Tree.Data.Data
             DeCompressGuidTool = Section_Tree.Data.ExtHeader.SectionDefinitionGuid_uuid
             Section_Tree.Data.Data = self.DeCompressData(DeCompressGuidTool, Section_Tree.Data.Data)
+            Section_Tree.Data.Size = len(Section_Tree.Data.Data) + Section_Tree.Data.HeaderLength
             print('\n      Size of Data Decompressed: {}!'.format(len(Section_Tree.Data.Data)))
             print('      Data Decompressed!')
             self.ParserFfs(Section_Tree, b'')
@@ -351,7 +360,9 @@ class FMMTParser:
             Section_Tree.Data.Data = Section_Data
             print('      Section_Tree.Data.Data length', len(Section_Tree.Data.Data))
             print('      Section_Tree.Data.Size', Section_Tree.Data.Size)
-
+            if Section_Tree.Data.Header.Type == 0:
+                print('Ffs Finished!')
+                break
             Pad_Size = 0
             if (Rel_Offset+Section_Tree.Data.HeaderLength+len(Section_Tree.Data.Data) != Data_Size) and Section_Tree.Data.Size % 4 != 0:
                 Pad_Size = 4 - Section_Tree.Data.Size % 4
@@ -433,7 +444,7 @@ class FMMTParser:
                 target_index = whole_data[cur_index:].index(EFI_FIRMWARE_FILE_SYSTEM2_GUID_BYTE) + cur_index
                 if whole_data[target_index+24:target_index+28] == FVH_SIGNATURE and whole_data[target_index-16:target_index] == ZEROVECTOR_BYTE:
                     Fd_Struct.append([FV_TREE, target_index - 16, unpack("Q", whole_data[target_index+16:target_index+24])])
-                    cur_index += Fd_Struct[-1][1] + Fd_Struct[-1][2][0]
+                    cur_index = Fd_Struct[-1][1] + Fd_Struct[-1][2][0]
                 else:
                     cur_index = target_index + 16
             else:
@@ -446,7 +457,7 @@ class FMMTParser:
                 print(EFI_FIRMWARE_FILE_SYSTEM3_GUID_BYTE, target_index)
                 if whole_data[target_index+24:target_index+28] == FVH_SIGNATURE and whole_data[target_index-16:target_index] == ZEROVECTOR_BYTE:
                     Fd_Struct.append([FV_TREE, target_index - 16, unpack("Q", whole_data[target_index+16:target_index+24])])
-                    cur_index += Fd_Struct[-1][1] + Fd_Struct[-1][2][0]
+                    cur_index = Fd_Struct[-1][1] + Fd_Struct[-1][2][0]
                 else:
                     cur_index = target_index + 16
             else:
@@ -458,7 +469,7 @@ class FMMTParser:
                 target_index = whole_data[cur_index:].index(EFI_SYSTEM_NVDATA_FV_GUID_BYTE) + cur_index
                 if whole_data[target_index+24:target_index+28] == FVH_SIGNATURE and whole_data[target_index-16:target_index] == ZEROVECTOR_BYTE:
                     Fd_Struct.append([DATA_FV_TREE, target_index - 16, unpack("Q", whole_data[target_index+16:target_index+24])])
-                    cur_index += Fd_Struct[-1][1] + Fd_Struct[-1][2][0]
+                    cur_index = Fd_Struct[-1][1] + Fd_Struct[-1][2][0]
                 else:
                     cur_index = target_index + 16
             else:
@@ -499,7 +510,7 @@ class FMMTParser:
         # Add the first collected Fv image into the tree.
         Cur_node = NODETREE(Fd_Struct[0][0]+ str(Fv_count))
         Cur_node.type = Fd_Struct[0][0]
-        Cur_node.Data = FvNode(Fv_count, whole_data[Fd_Struct[0][1]:Fd_Struct[0][2][0]])
+        Cur_node.Data = FvNode(Fv_count, whole_data[Fd_Struct[0][1]:Fd_Struct[0][1]+Fd_Struct[0][2][0]])
         Cur_node.Data.HOffset = Fd_Struct[0][1] + offset
         Cur_node.Data.DOffset = Cur_node.Data.HOffset+Cur_node.Data.Header.HeaderLength
         Cur_node.Data.Data = whole_data[Fd_Struct[0][1]+Cur_node.Data.Header.HeaderLength:Fd_Struct[0][1]+Cur_node.Data.Size]
@@ -539,19 +550,15 @@ class FMMTParser:
     ## Parser the nodes in WholeTree.
     def ParserFromRoot(self, WholeFvTree=None, whole_data=b'', Reloffset = 0):
         # If the current node is the root, it is the start of this parser.
-        if WholeFvTree.type == ROOT_TREE:
+        if WholeFvTree.type == ROOT_TREE or WholeFvTree.type == ROOT_FV_TREE:
             self.ParserData(whole_data, Reloffset)
             print("\nParser Fd Start!\n")
         # If the current node is a FvNode, parse it to create the Ffs node and get the Ffs info.
-        elif WholeFvTree.type == FV_TREE or WholeFvTree.type == SEC_FV_TREE:
+        elif WholeFvTree.type == FV_TREE or WholeFvTree.type == SEC_FV_TREE or WholeFvTree.type == ROOT_FFS_TREE:
             print('\nThis is the Fv leaf!')
-            # print('GetFv: ', WholeFvTree.Data.Name)
-            # print('  GetFvSize: ', WholeFvTree.Data.Size)
-            # print('  GetFvHOffset: ', WholeFvTree.Data.HOffset)
-            # print('  GetFvDOffset: ', WholeFvTree.Data.DOffset)
             self.ParserFv(WholeFvTree, whole_data, Reloffset)
         # If the current node is a SectionNode, parse it to get the section info and do it in circle.
-        elif WholeFvTree.type == FFS_TREE:
+        elif WholeFvTree.type == FFS_TREE or WholeFvTree.type == ROOT_SECTION_TREE:
             print('This is the Ffs leaf!\n')
             self.ParserFfs(WholeFvTree, whole_data, Reloffset)
         # If the current node is a FfsNode with data, skip it as it is only used to save data.
@@ -570,7 +577,7 @@ class FMMTParser:
             self.ParserFromRoot(Child, "")
 
     def Encapsulation(self, rootTree, CompressStatus):
-        if rootTree.type == ROOT_TREE:
+        if rootTree.type == ROOT_TREE or rootTree.type == ROOT_FV_TREE or rootTree.type == ROOT_FFS_TREE or rootTree.type == ROOT_SECTION_TREE:
             print('Start at Root !!')
         elif rootTree.type == BINARY_DATA or rootTree.type == FFS_FREE_SPACE:
             self.FinalData += rootTree.Data.Data
@@ -618,11 +625,13 @@ def SaveTreeInfo(TreeInfo, outputname):
         for item in TreeInfo:
             f.writelines(item + '\n')
 
-def ParserFile(inputfile, outputfile):
+# The ROOT_TYPE can be 'ROOT_TREE', 'ROOT_FV_TREE', 'ROOT_FFS_TREE', 'ROOT_SECTION_TREE'
+def ParserFile(inputfile, outputfile, ROOT_TYPE):
     with open(inputfile, "rb") as f:
-        whole_data = f.read()      
-    FmmtParser = FMMTParser(inputfile, ROOT_TREE)
+        whole_data = f.read()
+    FmmtParser = FMMTParser(inputfile, ROOT_TYPE)
     print("\nParserData Start!\n")
+    # FmmtParser.WholeFvTree.Data = whole_data
     FmmtParser.ParserFromRoot(FmmtParser.WholeFvTree, whole_data)
     FmmtParser.WholeFvTree.parserTree(FmmtParser.BinaryInfo)
     SaveTreeInfo(FmmtParser.BinaryInfo, "Log\ParserFv.log")
@@ -925,19 +934,20 @@ def Usage():
 
 def main():
     Usage()
-    inputfile = "Input\OVMF.fd"
+    # inputfile = "Input\OVMF.fd"
+    inputfile = "Input\Platform_SPR_EBG_TXTSX_Setup.fd"
     # inputfile = "Output\Output_E.ffs"
     # inputfile = "Output\Output.fd"
     # inputfile = "Input\PEIFV.Fv"
     # inputfile = "Input\SECFV.Fv"
     # inputfile = "Input\OVMF_VARS.fd"
     # inputfile = "Input\OVMF_CODE.fd"
-    # inputfile = "Input\MEMFD.fd"
     # inputfile = "Output\Output_D.fd"
     # NewFvfile = "Input\PEIFV.Fv"
     # NewFfsfile = "Output\Output_E.fd"
-    # ParserFile(inputfile, 'Output\Test.Ffs')
-    ExtractFfs(inputfile, uuid.UUID("df1ccef6-f301-4a63-9661-fc6030dcc880"), 'Output\Output_E.ffs')
+    ParserFile(r'Output\E_Test.ffs', r'Output\E_Test_Test.ffs', ROOT_FFS_TREE)
+    # ParserFile(inputfile, r'Output\test.fd', ROOT_TREE)
+    # ExtractFfs(inputfile, uuid.UUID("003e7b41-98a2-4be2-b27a-6c30c7655225"), 'Output\E_Test.ffs')
     # DeleteFfs(inputfile, uuid.UUID("df1ccef6-f301-4a63-9661-fc6030dcc880"), 'Output\Output_DFfs.fd', uuid.UUID('763bed0d-de9f-48f5-81f1-3e90e1b1a015'))
     # AddNewFfs('Output\Output_DFfs.fd', 'FV2', NewFfsfile, 'Output\Output_Affs.fd')
     # DeleteFv(inputfile, '763bed0d-de9f-48f5-81f1-3e90e1b1a015', 'Output\Output_D.fd')

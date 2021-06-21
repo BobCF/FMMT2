@@ -35,7 +35,8 @@ class EFI_COMMON_SECTION_HEADER2:
 
     @property
     def SECTION_SIZE(self):
-        return self.Size[0] | self.Size[1] << 8 | self.Size[2] << 16
+        return self.ExtendedSize
+        # return self.Size[0] | self.Size[1] << 8 | self.Size[2] << 16
 
     def Decode(self):
         self.Size = list(unpack("<BBB", self.buff[:3]))
