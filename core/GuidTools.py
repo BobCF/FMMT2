@@ -24,29 +24,22 @@ class GUIDTool:
         self.short_name: str = short_name
         self.command: str = command
 
-    def pack(self, *args, **kwargs):
-        pass
-
-    def unpack(self, buffer):
+    def pack(self, buffer):
         """
-        buffer: remove common header
+        compress file.
         """
         tool = self.command
         if tool:
-            tmp_dir = os.path.join(os.getcwd(), 'tmp')
-            if not os.path.exists(tmp_dir):
-                os.mkdir(tmp_dir)
-            tmp = tempfile.mkdtemp(dir=tmp_dir)
-            ToolInputFile = os.path.join(tmp, "sec_file")
-            ToolOuputFile = os.path.join(tmp, "uncompress_sec_file")
+            tmp = tempfile.mkdtemp(dir=os.environ.get('tmp'))
+            ToolInputFile = os.path.join(tmp, "uncompress_sec_file")
+            ToolOuputFile = os.path.join(tmp, "sec_file")
             try:
                 file = open(ToolInputFile, "wb")
                 file.write(buffer)
                 file.close()
-                # Run Command
-                systemCommand2 = [tool, '-d', '-o', ToolOuputFile, ToolInputFile]
-                os.system(' '.join(systemCommand2))
-                # Read output file return buffer
+                command = [tool, '-e', '-o', ToolOuputFile,
+                                  ToolInputFile]
+                os.system(' '.join(command))
                 buf = open(ToolOuputFile, "rb")
                 res_buffer = buf.read()
             except Exception as msg:
@@ -54,15 +47,46 @@ class GUIDTool:
                 return ""
             else:
                 buf.close()
-                if os.path.exists(tmp_dir):
-                    shutil.rmtree(tmp_dir)
+                if os.path.exists(tmp):
+                    shutil.rmtree(tmp)
+                return res_buffer
+        else:
+            logger.error(
+                "Error parsing section: EFI_SECTION_GUID_DEFINED cannot be parsed at this time.")
+            logger.info("Its GUID is: %s" % self.guid)
+            return ""
+
+
+    def unpack(self, buffer):
+        """
+        buffer: remove common header
+        uncompress file
+        """
+        tool = self.command
+        if tool:
+            tmp = tempfile.mkdtemp(dir=os.environ.get('tmp'))
+            ToolInputFile = os.path.join(tmp, "sec_file")
+            ToolOuputFile = os.path.join(tmp, "uncompress_sec_file")
+            try:
+                file = open(ToolInputFile, "wb")
+                file.write(buffer)
+                file.close()
+                command = [tool, '-d', '-o', ToolOuputFile, ToolInputFile]
+                os.system(' '.join(command))
+                buf = open(ToolOuputFile, "rb")
+                res_buffer = buf.read()
+            except Exception as msg:
+                logger.error(msg)
+                return ""
+            else:
+                buf.close()
+                if os.path.exists(tmp):
+                    shutil.rmtree(tmp)
                 return res_buffer
         else:
             logger.error("Error parsing section: EFI_SECTION_GUID_DEFINED cannot be parsed at this time.")
             logger.info("Its GUID is: %s" % self.guid)
             return ""
-
-
 
 
 class TianoCompress(GUIDTool):
