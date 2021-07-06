@@ -5,8 +5,7 @@ import shutil
 import sys
 import tempfile
 import uuid
-
-from PI.SectionHeader import EFI_GUID_DEFINED_SECTION
+from PI.CommonType import *
 
 
 logger = logging.getLogger("Section Type")
@@ -31,8 +30,8 @@ class GUIDTool:
         tool = self.command
         if tool:
             tmp = tempfile.mkdtemp(dir=os.environ.get('tmp'))
-            ToolInputFile = os.path.join(tmp, "uncompress_sec_file")
-            ToolOuputFile = os.path.join(tmp, "sec_file")
+            ToolInputFile = os.path.join(tmp, "pack_uncompress_sec_file")
+            ToolOuputFile = os.path.join(tmp, "pack_sec_file")
             try:
                 file = open(ToolInputFile, "wb")
                 file.write(buffer)
@@ -65,8 +64,8 @@ class GUIDTool:
         tool = self.command
         if tool:
             tmp = tempfile.mkdtemp(dir=os.environ.get('tmp'))
-            ToolInputFile = os.path.join(tmp, "sec_file")
-            ToolOuputFile = os.path.join(tmp, "uncompress_sec_file")
+            ToolInputFile = os.path.join(tmp, "unpack_sec_file")
+            ToolOuputFile = os.path.join(tmp, "unpack_uncompress_sec_file")
             try:
                 file = open(ToolInputFile, "wb")
                 file.write(buffer)
@@ -147,6 +146,22 @@ class GUIDTools:
         self.tooldef = dict()
         self.load()
 
+    def ModifyGuidFormat(self, target_guid):
+        target_guid = target_guid.replace('-', '')
+        print('target_guid', target_guid)
+        target_list = []
+        start = [0,8,12,16,18,20,22,24,26,28,30]
+        end = [8,12,16,18,20,22,24,26,28,30,32]
+        num = len(start)
+        for pos in range(num):
+            new_value = int(target_guid[start[pos]:end[pos]], 16)
+            target_list.append(new_value)
+        print('target_list', target_list)
+        new_format = GUID()
+        new_format.from_list(target_list)
+        print('new_format', new_format)
+        return struct2stream(new_format)
+
     def VerifyTools(self):
         """
         Verify Tools and Update Tools path.
@@ -174,7 +189,10 @@ class GUIDTools:
             for line in config_data:
                 try:
                     guid, short_name, command = line.split()
-                    self.tooldef[uuid.UUID(guid.strip())] = GUIDTool(
+                    print('guid.strip()', guid.strip())
+                    new_format_guid = self.ModifyGuidFormat(guid.strip())
+                    print('new_format_guid', new_format_guid)
+                    self.tooldef[new_format_guid] = GUIDTool(
                         guid.strip(), short_name.strip(), command.strip())
                 except:
                     print("error")

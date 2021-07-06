@@ -8,7 +8,9 @@
 from PI.FvHeader import *
 from PI.FfsFileHeader import *
 from PI.SectionHeader import *
+from PI.CommonType import *
 from core.GuidTools import *
+from ctypes import *
 import uuid
 import copy
 
@@ -26,24 +28,8 @@ ZEROVECTOR_BYTE = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00
 PADVECTOR = uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff")
 FVH_SIGNATURE = b'_FVH'
 
-SectionHeaderType = {
-    0x01:'EFI_COMPRESSION_SECTION',
-    0x02:'EFI_GUID_DEFINED_SECTION',
-    0x03:'EFI_SECTION_DISPOSABLE',
-    0x10:'EFI_SECTION_PE32',
-    0x11:'EFI_SECTION_PIC',
-    0x12:'EFI_SECTION_TE',
-    0x13:'EFI_SECTION_DXE_DEPEX',
-    0x14:'EFI_SECTION_VERSION',
-    0x15:'EFI_SECTION_USER_INTERFACE',
-    0x16:'EFI_SECTION_COMPATIBILITY16',
-    0x17:'EFI_SECTION_FIRMWARE_VOLUME_IMAGE',
-    0x18:'EFI_FREEFORM_SUBTYPE_GUID_SECTION',
-    0x19:'EFI_SECTION_RAW',
-    0x1B:'EFI_SECTION_PEI_DEPEX',
-    0x1C:'EFI_SECTION_MM_DEPEX'
-}
-'''              
+
+'''       
 0x03:EFI_COMMON_SECTION_HEADER,    # EFI_SECTION_DISPOSABLE
 0x10:EFI_COMMON_SECTION_HEADER,    # EFI_SECTION_PE32
 0x11:EFI_COMMON_SECTION_HEADER,    # EFI_SECTION_PIC
@@ -70,12 +56,26 @@ SECTION_TREE = 'SECTION'
 SEC_FV_TREE = 'SEC_FV_IMAGE'
 BINARY_DATA = 'BINARY'
 
-HeaderType = {0x01:EFI_COMPRESSION_SECTION, 
-            0x02:EFI_GUID_DEFINED_SECTION, 
-            0x14:EFI_SECTION_VERSION,
-            0x15:EFI_SECTION_USER_INTERFACE,
-            0x18:EFI_FREEFORM_SUBTYPE_GUID_SECTION,
-        }
+SectionHeaderType = {
+    0x01:'EFI_COMPRESSION_SECTION',
+    0x02:'EFI_GUID_DEFINED_SECTION',
+    0x03:'EFI_SECTION_DISPOSABLE',
+    0x10:'EFI_SECTION_PE32',
+    0x11:'EFI_SECTION_PIC',
+    0x12:'EFI_SECTION_TE',
+    0x13:'EFI_SECTION_DXE_DEPEX',
+    0x14:'EFI_SECTION_VERSION',
+    0x15:'EFI_SECTION_USER_INTERFACE',
+    0x16:'EFI_SECTION_COMPATIBILITY16',
+    0x17:'EFI_SECTION_FIRMWARE_VOLUME_IMAGE',
+    0x18:'EFI_FREEFORM_SUBTYPE_GUID_SECTION',
+    0x19:'EFI_SECTION_RAW',
+    0x1B:'EFI_SECTION_PEI_DEPEX',
+    0x1C:'EFI_SECTION_MM_DEPEX'
+}    
+# SectionHeaderType = [0x01, 0x02, 0x03, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1B, 0x1C]
+HeaderType = [0x01, 0x02, 0x14, 0x15, 0x18]
+# HeaderType = [0x01, 0x02, 0x18]
 
 # Section_Count = 0
 Fv_count = 0
@@ -90,10 +90,13 @@ class BinaryNode:
 
 class FvNode:
     def __init__(self, name, buffer: bytes):
-        self.Header = EFI_FIRMWARE_VOLUME_HEADER(buffer)
+        self.Header = EFI_FIRMWARE_VOLUME_HEADER.from_buffer_copy(buffer)
+        Map_num = (self.Header.HeaderLength - 56)//8
+        self.Header = Refine_FV_Header(Map_num).from_buffer_copy(buffer)
         self.Name = "FV" + str(name)
-        if self.Header.ExtHeader:
-            self.Name = self.Header.ExtHeader.FvName_uuid
+        if self.Header.ExtHeaderOffset:
+            self.ExtHeader = EFI_FIRMWARE_VOLUME_EXT_HEADER.from_buffer_copy(buffer[self.Header.ExtHeaderOffset:])
+            self.Name =  uuid.UUID(bytes_le=struct2stream(self.ExtHeader.FvName))
         self.Size = self.Header.FvLength
         self.HOffset = 0
         self.DOffset = 0
@@ -103,14 +106,17 @@ class FvNode:
             print('Error Fv Header!!')
         self.PadData = b''
 
+    def ModCheckSum(self):
+        pass
+
 class FfsNode:
     def __init__(self, buffer: bytes):
         self.Attributes = unpack("<B", buffer[19:20])[0]
         if self.Attributes != 0x01:
-            self.Header = EFI_FFS_FILE_HEADER(buffer)
+            self.Header = EFI_FFS_FILE_HEADER.from_buffer_copy(buffer)
         else:
-            self.Header = EFI_FFS_FILE_HEADER2(buffer)
-        self.Name = self.Header.Name_uuid
+            self.Header = EFI_FFS_FILE_HEADER2.from_buffer_copy(buffer)
+        self.Name = uuid.UUID(bytes_le=struct2stream(self.Header.Name))
         self.Size = self.Header.FFS_FILE_SIZE
         self.HOffset = 0
         self.DOffset = 0
@@ -118,12 +124,30 @@ class FfsNode:
         self.Data = b''
         self.PadData = b''
 
+    def ModCheckSum(self):
+        HeaderData = struct2stream(self.Header)
+        HeaderSum = 0
+        DataSum = 0
+        if self.Header.Attributes != '0x00':
+            for item in self.Data:
+                DataSum += item
+            if hex(DataSum + self.Header.IntegrityCheck.Checksum.File)[-2:] != '00':
+                self.Header.IntegrityCheck.Checksum.File == 0x100 - int(hex(DataSum)[-2:], 16)
+        else:
+            self.Header.IntegrityCheck.Checksum.File =='0xAA'
+        for item in HeaderData:
+            HeaderSum += item
+        HeaderSum -= self.Header.State
+        HeaderSum -= self.Header.IntegrityCheck.Checksum.File
+        if hex(HeaderSum)[-2:] != '00':
+            self.Header.IntegrityCheck.Checksum.Header == 0x100 - int(hex(HeaderSum)[-2:], 16)
+
 class SectionNode:
     def __init__(self, buffer: bytes):
         if buffer[0:3] != b'\xff\xff\xff':
-            self.Header = EFI_COMMON_SECTION_HEADER(buffer)
+            self.Header = EFI_COMMON_SECTION_HEADER.from_buffer_copy(buffer)
         else:
-            self.Header = EFI_COMMON_SECTION_HEADER2(buffer)
+            self.Header = EFI_COMMON_SECTION_HEADER2.from_buffer_copy(buffer)
         if self.Header.Type in SectionHeaderType:
             self.Name = SectionHeaderType[self.Header.Type]
         elif self.Header.Type == 0:
@@ -131,11 +155,11 @@ class SectionNode:
         else:
             self.Name = "SECTION"
         if self.Header.Type in HeaderType:
-            self.ExtHeader = self.GetExtHeader(self.Header.Type, buffer[self.Header.common_head_size:])
-            self.HeaderLength = self.Header.common_head_size + self.ExtHeader.ExtHeaderSize()
+            self.ExtHeader = self.GetExtHeader(self.Header.Type, buffer[self.Header.Common_Header_Size():])
+            self.HeaderLength = self.Header.Common_Header_Size() + self.ExtHeader.ExtHeaderSize()
         else:
             self.ExtHeader = None
-            self.HeaderLength = self.Header.common_head_size
+            self.HeaderLength = self.Header.Common_Header_Size()
         self.Size = self.Header.SECTION_SIZE
         self.Type = self.Header.Type
         self.HOffset = 0
@@ -146,17 +170,17 @@ class SectionNode:
         self.OriHeader = b''
         self.PadData = b''
 
-    def GetExtHeader(self, Type, buffer):
+    def GetExtHeader(self, Type, buffer:bytes):
         if Type == 0x01:
-            return EFI_COMPRESSION_SECTION(buffer)
+            return EFI_COMPRESSION_SECTION.from_buffer_copy(buffer)
         elif Type == 0x02:
-            return EFI_GUID_DEFINED_SECTION(buffer)
+            return EFI_GUID_DEFINED_SECTION.from_buffer_copy(buffer)
         elif Type == 0x14:
-            return EFI_SECTION_VERSION(buffer)
+            return EFI_SECTION_VERSION.from_buffer_copy(buffer)
         elif Type == 0x15:
-            return EFI_SECTION_USER_INTERFACE(buffer)
+            return EFI_SECTION_USER_INTERFACE.from_buffer_copy(buffer)
         elif Type == 0x18:
-            return EFI_FREEFORM_SUBTYPE_GUID_SECTION(buffer)
+            return EFI_FREEFORM_SUBTYPE_GUID_SECTION.from_buffer_copy(buffer)
 
 class NODETREE:
     def __init__(self, NodeName):
@@ -264,31 +288,178 @@ class FMMTParser:
         self.FinalData = b''
         self.BinaryInfo = []
 
+    def GetPadSize(self, Size, alignment):
+        if Size % alignment == 0:
+            return 0
+        Pad_Size = alignment - Size % alignment
+        return Pad_Size
+
+    def ChangeSize(self, TargetTree, size_delta = 0):
+        if type(TargetTree.Data.Header) == type(EFI_FFS_FILE_HEADER2) or type(TargetTree.Data.Header) == type(EFI_COMMON_SECTION_HEADER2): 
+            TargetTree.Data.Size -= size_delta
+            TargetTree.Data.Header.ExtendedSize -= size_delta 
+        else:
+            TargetTree.Data.Size -= size_delta
+            TargetTree.Data.Header.Size[0] = TargetTree.Data.Size % (16**2)
+            TargetTree.Data.Header.Size[1] = TargetTree.Data.Size % (16**4) //(16**2)
+            TargetTree.Data.Header.Size[2] = TargetTree.Data.Size // (16**4)
+
     def ReCompressed(self, TargetTree):
         TreePath = TargetTree.GetTreePath()
         print('TreePath', TreePath)
         pos = len(TreePath)
-        print('pos', pos)
+        print('\npos', pos)
         while pos:
+            print(TreePath[pos-1].key)
             if TreePath[pos-1].type == SECTION_TREE and TreePath[pos-1].Data.Type == 0x02:
-                self.CompressSectionData(TreePath[pos-1].Data.ExtHeader.SectionDefinitionGuid_uuid, TreePath[pos-1])
+                self.CompressSectionData(TreePath[pos-1], pos, TreePath[pos-1].Data.ExtHeader.SectionDefinitionGuid)
+            else:
+                self.CompressSectionData(TreePath[pos-1], pos)
             pos -= 1
-            print('pos', pos)
+            print('\npos', pos)
 
-    def CompressSectionData(self, GuidTool, SectionTree):
-        self.FinalData = b''
-        self.Encapsulation(SectionTree, True)
-        SectionTree.Data.Data = self.FinalData
-        guidtool = GUIDTools(r'FMMTConfig.ini').__getitem__(GuidTool)
-        # CompressedData = guidtool.pack(SectionTree.Data.Data)
-        # SectionTree.Data.OriData = CompressedData
+    def CompressSectionData(self, TargetTree, pos, GuidTool=None):
+        NewData = b''
+        temp_save_child = TargetTree.Child
+        with open('Output\Add_Child_{}.ffs'.format(pos), "wb") as f:
+            for item in temp_save_child:
+                if item.type == SECTION_TREE and item.Data.ExtHeader:
+                    f.write(struct2stream(item.Data.Header)+ struct2stream(item.Data.ExtHeader) + item.Data.Data + item.Data.PadData)
+                    NewData += struct2stream(item.Data.Header) + struct2stream(item.Data.ExtHeader) + item.Data.Data + item.Data.PadData
+                else:
+                    f.write(struct2stream(item.Data.Header) + item.Data.Data + item.Data.PadData)
+                    NewData += struct2stream(item.Data.Header) + item.Data.Data + item.Data.PadData
+        if TargetTree.Data:
+            with open('Output\Sec_ori_{}.ffs'.format(pos), "wb") as f:
+                f.write(TargetTree.Data.Data)           
+            print('Ori TargetTree.Data.Data', len(TargetTree.Data.Data))
+            TargetTree.Data.Data = NewData
+            with open('Output\Sec_new_{}.ffs'.format(pos), "wb") as f:
+                f.write(TargetTree.Data.Data)
+            print('length of current FinalData\n', len(TargetTree.Data.Data))
+        if GuidTool:
+            guidtool = GUIDTools(r'FMMTConfig.ini').__getitem__(GuidTool)
+            print('len(TargetTree.Data.OriData)', len(TargetTree.Data.OriData))
+            CompressedData = guidtool.pack(TargetTree.Data.Data)
+
+            if len(CompressedData) < len(TargetTree.Data.OriData):
+                size_delta = len(TargetTree.Data.OriData) - len(CompressedData)
+                print('TargetTree.Size', hex(TargetTree.Data.Size))
+                self.ChangeSize(TargetTree, size_delta)
+                print('Changed TargetTree.Size', hex(TargetTree.Data.Size))
+                OriPad_Size = len(TargetTree.Data.PadData)
+                NewPad_Size = self.GetPadSize(TargetTree.Data.Size, 4)
+                TargetTree.Data.PadData = NewPad_Size * b'\x00'
+                TargetTree.Data.OriData = CompressedData
+                print('len(TargetTree.Data.Data)', len(TargetTree.Data.Data))
+                print('len(CompressedData)', len(CompressedData))
+                offset_delta = size_delta + OriPad_Size - NewPad_Size
+                while TargetTree.NextRel:
+                    TargetTree.NextRel.Data.HOffset -= offset_delta
+                    TargetTree.NextRel.Data.DOffset -= offset_delta
+                    TargetTree = TargetTree.NextRel
+                # TargetTree.Data.PadData += offset_delta * b'\xff'
+                Tar_Parent = TargetTree.Parent
+                NextFfs = Tar_Parent.NextRel
+                print('Tar_Parent', Tar_Parent.Data.Name)
+                print('NextFfs', NextFfs.Data.Name)
+                if NextFfs.type == FFS_PAD:
+                    self.ChangeSize(Tar_Parent, offset_delta)
+                    Tar_Parent_Ori_Pad = len(Tar_Parent.Data.PadData)
+                    Tar_Parent_New_Pad = self.GetPadSize(Tar_Parent.Data.Size, 8)
+                    Tar_Parent.Data.PadData =  Tar_Parent_New_Pad * b'\xff'
+                    ffs_offset_delta = offset_delta - Tar_Parent_New_Pad + Tar_Parent_Ori_Pad
+                    NextFfs.Data.HOffset -= ffs_offset_delta
+                    NextFfs.Data.DOffset -= ffs_offset_delta
+                    print('NextFfs.Data.HOffset', NextFfs.Data.HOffset)
+                    NextFfs.Data.Data += ffs_offset_delta * b'\xff'
+                    # NextFfs.Data.Size += ffs_offset_delta
+                    self.ChangeSize(NextFfs, -ffs_offset_delta)
+                elif NextFfs.type == FFS_FREE_SPACE:
+                    # Tar_Parent.Data.Size -= offset_delta
+                    self.ChangeSize(Tar_Parent, offset_delta)
+                    Tar_Parent_Ori_Pad = len(Tar_Parent.Data.PadData)
+                    Tar_Parent_New_Pad = self.GetPadSize(Tar_Parent.Data.Size, 8)
+                    Tar_Parent.Data.PadData =  Tar_Parent_New_Pad * b'\xff'
+                    ffs_offset_delta = offset_delta - Tar_Parent_New_Pad + Tar_Parent_Ori_Pad
+                    NextFfs.Data.HOffset -= ffs_offset_delta
+                    NextFfs.Data.DOffset -= ffs_offset_delta
+                    NextFfs.Data.Data += ffs_offset_delta * b'\xff'
+                else:
+                    if offset_delta >= Tar_Parent.Data.Header.HeaderLength:
+                        self.ChangeSize(Tar_Parent, offset_delta)
+                        Tar_Parent_Ori_Pad = len(Tar_Parent.Data.PadData)
+                        Tar_Parent_New_Pad = self.GetPadSize(Tar_Parent.Data.Size, 8)
+                        Tar_Parent.Data.PadData =  Tar_Parent_New_Pad * b'\xff'
+                        ffs_offset_delta = offset_delta - Tar_Parent_New_Pad + Tar_Parent_Ori_Pad
+                        new_ffs_pad = NODETREE(PADVECTOR)
+                        new_ffs_pad.type = FFS_PAD
+                        new_ffs_pad.Data = FfsNode(b'\xff'* ffs_offset_delta)
+                        new_ffs_pad.Data.Size = ffs_offset_delta
+                        self.ChangeSize(new_ffs_pad)
+                        Target_index = Tar_Parent.Parent.Child.index(NextFfs)
+                        Tar_Parent.Parent.insertChild(new_ffs_pad, Target_index)
+                    else:
+                        TargetTree.Data.PadData += offset_delta * b'\x00'
+            elif len(CompressedData) > len(TargetTree.Data.OriData):
+                size_delta = len(CompressedData) - len(TargetTree.Data.OriData)
+                self.ChangeSize(TargetTree, -size_delta)
+                OriPad_Size = len(TargetTree.Data.PadData)
+                NewPad_Size = self.GetPadSize(TargetTree.Data.Size, 4)
+                TargetTree.Data.PadData = NewPad_Size * b'\x00'
+                TargetTree.Data.OriData = CompressedData
+                offset_delta = size_delta - OriPad_Size + NewPad_Size
+                Tar_Parent = TargetTree.Parent
+                NextFfs = Tar_Parent.NextRel
+                if NextFfs.type == FFS_FREE_SPACE and offset_delta <= len(NextFfs.Data.Data):
+                    while TargetTree.NextRel:
+                        TargetTree.NextRel.Data.HOffset += offset_delta
+                        TargetTree.NextRel.Data.DOffset += offset_delta
+                        TargetTree = TargetTree.NextRel
+                    self.ChangeSize(Tar_Parent, -offset_delta)
+                    Tar_Parent_Ori_Pad = len(Tar_Parent.Data.PadData)
+                    Tar_Parent_New_Pad = self.GetPadSize(Tar_Parent.Data.Size, 8)
+                    Tar_Parent.Data.PadData =  Tar_Parent_New_Pad * b'\xff'
+                    ffs_offset_delta = offset_delta + Tar_Parent_New_Pad - Tar_Parent_Ori_Pad
+                    NextFfs.Data.HOffset += ffs_offset_delta
+                    NextFfs.Data.DOffset += ffs_offset_delta
+                    NextFfs.Data.Data = (len(NextFfs.Data.Data) - ffs_offset_delta) * b'\xff'
+                elif NextFfs.type == FFS_PAD and offset_delta <= NextFfs.Data.Size + len(NextFfs.Data.PadData)- NextFfs.Data.Header.HeaderLength:
+                    while TargetTree.NextRel:
+                        TargetTree.NextRel.Data.HOffset += offset_delta
+                        TargetTree.NextRel.Data.DOffset += offset_delta
+                        TargetTree = TargetTree.NextRel
+                    self.ChangeSize(Tar_Parent, -offset_delta)
+                    Tar_Parent_Ori_Pad = len(Tar_Parent.Data.PadData)
+                    Tar_Parent_New_Pad = self.GetPadSize(Tar_Parent.Data.Size, 8)
+                    Tar_Parent.Data.PadData =  Tar_Parent_New_Pad * b'\xff'
+                    ffs_offset_delta = offset_delta + Tar_Parent_New_Pad - Tar_Parent_Ori_Pad
+                    NextFfs.Data.HOffset += ffs_offset_delta
+                    NextFfs.Data.DOffset += ffs_offset_delta
+                    self.ChangeSize(NextFfs, ffs_offset_delta)
+                    NextFfs.Data.Data = NextFfs.Data.Data[:NextFfs.Data.Size]
+                elif NextFfs.type == FFS_PAD and offset_delta <= (NextFfs.Data.Size + len(NextFfs.Data.PadData)):
+                    while TargetTree.NextRel:
+                        TargetTree.NextRel.Data.HOffset += offset_delta
+                        TargetTree.NextRel.Data.DOffset += offset_delta
+                        TargetTree = TargetTree.NextRel
+                    self.ChangeSize(Tar_Parent, -NextFfs.Data.Size)
+                    Tar_Parent_Ori_Pad = len(Tar_Parent.Data.PadData)
+                    Tar_Parent_New_Pad = self.GetPadSize(Tar_Parent.Data.Size, 8)
+                    Tar_Parent.Data.PadData =  Tar_Parent_New_Pad * b'\xff'
+                    ffs_offset_delta = offset_delta + Tar_Parent_New_Pad - Tar_Parent_Ori_Pad
+                    NextFfs.Data.Size -= ffs_offset_delta
+                    NextFfs.Data.Data = NextFfs.Data.Data[:NextFfs.Data.Size]
+                    Tar_Parent.Data.Data += (NextFfs.Data.Size + len(NextFfs.Data.PadData)) * b'\x00'
+                    # Tar_Parent.Data.Size += NextFfs.Data.Size + len(NextFfs.Data.PadData)
+                    self.ChangeSize(Tar_Parent, -(NextFfs.Data.Size + len(NextFfs.Data.PadData)))
+                    Tar_Parent.Parent.Child.remove(NextFfs)
+                else:
+                    print('Error Compress! Do not have enough space to store new Compressed data!!')
 
     ## Use GuidTool to decompress data.
     def DeCompressData(self, GuidTool, Section_Data):
-        print('len_Section_Data', len(Section_Data))
-        guidtool = GUIDTools(r'FMMTConfig.ini').__getitem__(GuidTool)
-        print(guidtool)
-        print(guidtool.command)
+        guidtool = GUIDTools(r'FMMTConfig.ini').__getitem__(struct2stream(GuidTool))
         DecompressedData = guidtool.unpack(Section_Data)
         return DecompressedData
 
@@ -298,12 +469,11 @@ class FMMTParser:
         print(Section_Tree.Data.Type)
         if Section_Tree.Data.Type == 0x01:
             Section_Tree.Data.OriData = Section_Tree.Data.Data
-            # Section_Tree.Data.Data = self.Decompress(Section_Tree.Data.Data)
             self.ParserFfs(Section_Tree, b'')
         elif Section_Tree.Data.Type == 0x02:
             print("GuidTool*************************************************")
             Section_Tree.Data.OriData = Section_Tree.Data.Data
-            DeCompressGuidTool = Section_Tree.Data.ExtHeader.SectionDefinitionGuid_uuid
+            DeCompressGuidTool = Section_Tree.Data.ExtHeader.SectionDefinitionGuid
             Section_Tree.Data.Data = self.DeCompressData(DeCompressGuidTool, Section_Tree.Data.Data)
             Section_Tree.Data.Size = len(Section_Tree.Data.Data) + Section_Tree.Data.HeaderLength
             print('\n      Size of Data Decompressed: {}!'.format(len(Section_Tree.Data.Data)))
@@ -353,7 +523,7 @@ class FMMTParser:
             print('      Section RelDataRange:', Rel_Offset+Section_Tree.Data.HeaderLength, Rel_Offset+Section_Tree.Data.Size)
             print('      Section DataRange:', Section_Offset+Section_Tree.Data.HeaderLength, Section_Offset+Section_Tree.Data.Size)
             print('      Section_Tree.Data.Header.Type', Section_Tree.Data.Header.Type)
-            print('      Section_Tree.Data.Header.common_head_size', Section_Tree.Data.Header.common_head_size)
+            print('      Section_Tree.Data.Header.Common_Header_Size', Section_Tree.Data.Header.Common_Header_Size())
             
             Section_Tree.Data.HOffset = Section_Offset + Rel_Whole_Offset
             Section_Tree.Data.ROffset = Rel_Offset
@@ -364,8 +534,8 @@ class FMMTParser:
                 print('Ffs Finished!')
                 break
             Pad_Size = 0
-            if (Rel_Offset+Section_Tree.Data.HeaderLength+len(Section_Tree.Data.Data) != Data_Size) and Section_Tree.Data.Size % 4 != 0:
-                Pad_Size = 4 - Section_Tree.Data.Size % 4
+            if (Rel_Offset+Section_Tree.Data.HeaderLength+len(Section_Tree.Data.Data) != Data_Size):
+                Pad_Size = self.GetPadSize(Section_Tree.Data.Size, 4)
                 Section_Tree.Data.PadData = Pad_Size * b'\x00'
                 print('      Add PadDataSize: ', Pad_Size)
             
@@ -408,7 +578,7 @@ class FMMTParser:
                 Ffs_Tree.Data.Data = Whole_Data[Rel_Offset+Ffs_Tree.Data.Header.HeaderLength: Rel_Offset+Ffs_Tree.Data.Size]
                 Ffs_Tree.Data.Size = len(Ffs_Tree.Data.Data) + Ffs_Tree.Data.Header.HeaderLength
                 # if current Ffs is the final ffs of Fv and full of b'\xff', define it with Free_Space
-                if Ffs_Tree.Data.Header.Encode().replace(b'xff', b'') == b'':
+                if struct2stream(Ffs_Tree.Data.Header).replace(b'xff', b'') == b'':
                     Ffs_Tree.type = FFS_FREE_SPACE
                     Ffs_Tree.Data.Data = Whole_Data[Rel_Offset:]
             else:
@@ -416,8 +586,8 @@ class FMMTParser:
                 Ffs_Tree.Data.Data = Whole_Data[Rel_Offset+Ffs_Tree.Data.Header.HeaderLength: Rel_Offset+Ffs_Tree.Data.Size]
             # The final Ffs in Fv does not need to add padding, else must be 8-bytes align with Fv start offset
             Pad_Size = 0
-            if Ffs_Tree.type != FFS_FREE_SPACE and (Rel_Offset+Ffs_Tree.Data.Header.HeaderLength+len(Ffs_Tree.Data.Data) != Data_Size) and Ffs_Tree.Data.Size % 8 != 0:  
-                Pad_Size = 8 - Ffs_Tree.Data.Size % 8
+            if Ffs_Tree.type != FFS_FREE_SPACE and (Rel_Offset+Ffs_Tree.Data.Header.HeaderLength+len(Ffs_Tree.Data.Data) != Data_Size):  
+                Pad_Size = self.GetPadSize(Ffs_Tree.Data.Size, 8)
                 Ffs_Tree.Data.PadData = Pad_Size * b'\xff'
                 print('  Add PadDataSize:{} PadData:{} '.format(Pad_Size, Ffs_Tree.Data.PadData))
 
@@ -584,39 +754,51 @@ class FMMTParser:
             rootTree.Child = []
         elif rootTree.type == DATA_FV_TREE or rootTree.type == FFS_PAD:
             print('Encapsulation leaf DataFv/FfsPad - {} Data'.format(rootTree.key))
-            self.FinalData += rootTree.Data.Header.Encode() + rootTree.Data.Data + rootTree.Data.PadData
+            self.FinalData += struct2stream(rootTree.Data.Header) + rootTree.Data.Data + rootTree.Data.PadData
             if rootTree.isFinalChild():
                 ParTree = rootTree.Parent
                 if ParTree.type != 'ROOT':
                     self.FinalData += ParTree.Data.PadData
             rootTree.Child = []
-        elif rootTree.type == FV_TREE or rootTree.type == FFS_TREE:
+        elif rootTree.type == FV_TREE or rootTree.type == FFS_TREE or rootTree.type == SEC_FV_TREE:
             if rootTree.HasChild():
                 print('Encapsulation Encap Fv/Ffs- {}'.format(rootTree.key))
-                self.FinalData += rootTree.Data.Header.Encode()
+                self.FinalData += struct2stream(rootTree.Data.Header)
             else:
                 print('Encapsulation leaf Fv/Ffs - {} Data'.format(rootTree.key))
-                self.FinalData += rootTree.Data.Header.Encode() + rootTree.Data.Data + rootTree.Data.PadData
+                self.FinalData += struct2stream(rootTree.Data.Header) + rootTree.Data.Data + rootTree.Data.PadData
                 if rootTree.isFinalChild():
                     ParTree = rootTree.Parent
                     if ParTree.type != 'ROOT':
                         self.FinalData += ParTree.Data.PadData
         elif rootTree.type == SECTION_TREE:
-            if rootTree.Data.OriData == b'':
-                print('Encapsulation Uncompress Section - {} Data'.format(rootTree.key))
-                Data = rootTree.Data.Data
+            # Not compressed section
+            if rootTree.Data.OriData == b'' or (rootTree.Data.OriData != b'' and CompressStatus):
+                if rootTree.HasChild():
+                    if rootTree.Data.ExtHeader:
+                        self.FinalData += struct2stream(rootTree.Data.Header) + struct2stream(rootTree.Data.ExtHeader)
+                    else:
+                        self.FinalData += struct2stream(rootTree.Data.Header)
+                else:
+                    Data = rootTree.Data.Data
+                    if rootTree.Data.ExtHeader:
+                        self.FinalData += struct2stream(rootTree.Data.Header) + struct2stream(rootTree.Data.ExtHeader) + Data + rootTree.Data.PadData
+                    else:
+                        self.FinalData += struct2stream(rootTree.Data.Header) + Data + rootTree.Data.PadData
+                    if rootTree.isFinalChild():
+                        ParTree = rootTree.Parent
+                        self.FinalData += ParTree.Data.PadData
+            # If compressed section
             else:
-                print('Encapsulation Compressed Section- {} Data'.format(rootTree.key))
                 Data = rootTree.Data.OriData
-            if rootTree.Data.ExtHeader:
-                self.FinalData += rootTree.Data.Header.Encode() + rootTree.Data.ExtHeader.Encode() + Data + rootTree.Data.PadData
-            else:
-                self.FinalData += rootTree.Data.Header.Encode() + Data + rootTree.Data.PadData
-            if not CompressStatus:
                 rootTree.Child = []
-            if rootTree.isFinalChild():
-                ParTree = rootTree.Parent
-                self.FinalData += ParTree.Data.PadData
+                if rootTree.Data.ExtHeader:
+                    self.FinalData += struct2stream(rootTree.Data.Header) + struct2stream(rootTree.Data.ExtHeader) + Data + rootTree.Data.PadData
+                else:
+                    self.FinalData += struct2stream(rootTree.Data.Header) + Data + rootTree.Data.PadData
+                if rootTree.isFinalChild():
+                    ParTree = rootTree.Parent
+                    self.FinalData += ParTree.Data.PadData
         for Child in rootTree.Child:
             self.Encapsulation(Child, CompressStatus)
 
@@ -634,7 +816,7 @@ def ParserFile(inputfile, outputfile, ROOT_TYPE):
     # FmmtParser.WholeFvTree.Data = whole_data
     FmmtParser.ParserFromRoot(FmmtParser.WholeFvTree, whole_data)
     FmmtParser.WholeFvTree.parserTree(FmmtParser.BinaryInfo)
-    SaveTreeInfo(FmmtParser.BinaryInfo, "Log\ParserFv.log")
+    SaveTreeInfo(FmmtParser.BinaryInfo, "Log\Parser_{}.log".format(os.path.basename(inputfile)))
     FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)
     with open(outputfile, "wb") as f:
         f.write(FmmtParser.FinalData)
@@ -654,7 +836,7 @@ def DeleteFv(inputfile, TargetFv_name, outputfile):
             item.Data.Data = b'\xff' * item.Data.Size
             FmmtParser.ReCompressed(item.Parent)
     FmmtParser.WholeFvTree.parserTree(FmmtParser.BinaryInfo)
-    SaveTreeInfo(FmmtParser.BinaryInfo, "Log\DeleteFv.log")
+    SaveTreeInfo(FmmtParser.BinaryInfo, "Log\Delete_{}.log".format(os.path.basename(inputfile)))
     FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)
     with open(outputfile, "wb") as f:
         f.write(FmmtParser.FinalData)
@@ -667,12 +849,13 @@ def DeleteFfs(inputfile, TargetFfs_name, outputfile, Fv_name=None):
     FmmtParser.WholeFvTree.parserTree(FmmtParser.BinaryInfo)
 
     FmmtParser.WholeFvTree.FindNode(TargetFfs_name, FmmtParser.WholeFvTree.Findlist)
+    print(FmmtParser.WholeFvTree.Findlist)
     # Choose the Specfic DeleteFfs with Fv info
     if Fv_name:
         for item in FmmtParser.WholeFvTree.Findlist:
             if item.Parent.key != Fv_name and item.Parent.Data.Name != Fv_name:
                 FmmtParser.WholeFvTree.Findlist.remove(item)
-    print(FmmtParser.WholeFvTree.Findlist[0])
+    print(FmmtParser.WholeFvTree.Findlist)
     print(FmmtParser.WholeFvTree.Findlist[0].Data.Name)
     if FmmtParser.WholeFvTree.Findlist != []:
         for Delete_Ffs in FmmtParser.WholeFvTree.Findlist:
@@ -682,16 +865,12 @@ def DeleteFfs(inputfile, TargetFfs_name, outputfile, Fv_name=None):
             if LastFfs and LastFfs.type == FFS_PAD:
                 # Both LastNode and NextNode are FFS_PAD
                 if NextFfs and NextFfs.type == FFS_PAD:
-                    AppendBytes = b'\xff' * ((len(Delete_Ffs.Data.Header.Encode())*2) + \
+                    AppendBytes = b'\xff' * ((Delete_Ffs.Data.Header.HeaderLength*2) + \
                                     len(Delete_Ffs.Data.Data)) + Delete_Ffs.Data.PadData + \
                                     NextFfs.Data.Data + NextFfs.Data.PadData
                     AppendSize = len(AppendBytes)
                     LastFfs.Data.Size += AppendSize
-                    LastFfs.Data.Header.Size = list(LastFfs.Data.Header.Size)
-                    LastFfs.Data.Header.Size[0] = LastFfs.Data.Size % (16**2)
-                    LastFfs.Data.Header.Size[1] = LastFfs.Data.Size % (16**4) //(16**2)
-                    LastFfs.Data.Header.Size[2] = LastFfs.Data.Size // (16**4)
-                    LastFfs.Data.Header.Size = tuple(LastFfs.Data.Header.Size)
+                    FmmtParser.ChangeSize(LastFfs, -AppendSize)
                     LastFfs.Data.Data += AppendBytes
                     LastFfs.NextRel = NextFfs.NextRel
                     NextFfs.NextRel.LastRel = LastFfs
@@ -700,9 +879,9 @@ def DeleteFfs(inputfile, TargetFfs_name, outputfile, Fv_name=None):
                 # Both LastNode and NextNode are FFS_PAD, and NextNode is the last node
                 elif NextFfs and NextFfs.type == FFS_FREE_SPACE:
                     LastFfs.type == FFS_FREE_SPACE
-                    LastFfs.Data.Data = b'\xff'*(len(LastFfs.Data.Header.Encode()) + \
+                    LastFfs.Data.Data = b'\xff'*(LastFfs.Data.Header.HeaderLength + \
                                         len(LastFfs.Data.Data) + \
-                                        len(Delete_Ffs.Data.Header.Encode()) + \
+                                        Delete_Ffs.Data.Header.HeaderLength + \
                                         len(Delete_Ffs.Data.Data) + \
                                         len(NextFfs.Data.Data))
                     LastFfs.NextRel = None
@@ -710,15 +889,11 @@ def DeleteFfs(inputfile, TargetFfs_name, outputfile, Fv_name=None):
                     Delete_Fv.Child.remove(NextFfs)
                 # Only LastNode is FFS_PAD
                 elif NextFfs:
-                    AppendBytes = b'\xff' * (len(Delete_Ffs.Data.Header.Encode()) + \
+                    AppendBytes = b'\xff' * (Delete_Ffs.Data.Header.HeaderLength + \
                                     len(Delete_Ffs.Data.Data)) + Delete_Ffs.Data.PadData
                     AppendSize = len(AppendBytes)
                     LastFfs.Data.Size += AppendSize
-                    LastFfs.Data.Header.Size = list(LastFfs.Data.Header.Size)
-                    LastFfs.Data.Header.Size[0] = LastFfs.Data.Size % (16**2)
-                    LastFfs.Data.Header.Size[1] = LastFfs.Data.Size % (16**4) //(16**2)
-                    LastFfs.Data.Header.Size[2] = LastFfs.Data.Size // (16**4)
-                    LastFfs.Data.Header.Size = tuple(LastFfs.Data.Header.Size)
+                    FmmtParser.ChangeSize(LastFfs, -AppendSize)
                     LastFfs.Data.Data += AppendBytes
                     LastFfs.NextRel = Delete_Ffs.NextRel
                     Delete_Ffs.NextRel.LastRel = LastFfs
@@ -726,7 +901,7 @@ def DeleteFfs(inputfile, TargetFfs_name, outputfile, Fv_name=None):
                 # The Target FFs is the last node
                 else:
                     LastFfs.type == FFS_FREE_SPACE
-                    LastFfs.Data.Data = b'\xff'*(len(LastFfs.Data.Header.Encode()) + \
+                    LastFfs.Data.Data = b'\xff'*(LastFfs.Data.Header.HeaderLength + \
                                         len(LastFfs.Data.Data) + \
                                         len(Delete_Ffs.Data.Data))
                     LastFfs.NextRel = None
@@ -735,17 +910,13 @@ def DeleteFfs(inputfile, TargetFfs_name, outputfile, Fv_name=None):
             elif LastFfs:
                 # if the NextFfs is a FFS_PAD, combine
                 if NextFfs and NextFfs.type == FFS_PAD:
-                    AppendBytes = b'\xff' * (len(NextFfs.Data.Header.Encode())) + \
+                    AppendBytes = b'\xff' * NextFfs.Data.Header.HeaderLength + \
                                     NextFfs.Data.Data + NextFfs.Data.PadData
                     AppendSize = len(AppendBytes)
                     Delete_Ffs.Data.Size += AppendSize
                     Delete_Ffs.type = FFS_PAD
                     Delete_Ffs.Data.Name = PADVECTOR
-                    Delete_Ffs.Data.Header.Size = list(Delete_Ffs.Data.Header.Size)
-                    Delete_Ffs.Data.Header.Size[0] = Delete_Ffs.Data.Size % (16**2)
-                    Delete_Ffs.Data.Header.Size[1] = Delete_Ffs.Data.Size % (16**4) //(16**2)
-                    Delete_Ffs.Data.Header.Size[2] = Delete_Ffs.Data.Size // (16**4)
-                    Delete_Ffs.Data.Header.Size = tuple(Delete_Ffs.Data.Header.Size)
+                    FmmtParser.ChangeSize(Delete_Ffs, -AppendSize)
                     Delete_Ffs.Data.Data = b'\xff' * len(Delete_Ffs.Data.Data) + AppendBytes
                     Delete_Ffs.NextRel = NextFfs.NextRel
                     NextFfs.NextRel.LastRel = Delete_Ffs
@@ -753,7 +924,7 @@ def DeleteFfs(inputfile, TargetFfs_name, outputfile, Fv_name=None):
                 # if the NextFfs is a FFS_PAD, and it is the last node.
                 elif NextFfs and NextFfs.type == FFS_FREE_SPACE:
                     Delete_Ffs.type == FFS_FREE_SPACE
-                    Delete_Ffs.Data.Data = b'\xff'*(len(Delete_Ffs.Data.Header.Encode()) + \
+                    Delete_Ffs.Data.Data = b'\xff'*(Delete_Ffs.Data.Header.HeaderLength + \
                                         len(Delete_Ffs.Data.Data) + \
                                         len(NextFfs.Data.Data))
                     Delete_Ffs.NextRel = None
@@ -766,7 +937,7 @@ def DeleteFfs(inputfile, TargetFfs_name, outputfile, Fv_name=None):
                 # if the target FFs is the last node
                 else:
                     Delete_Ffs.type == FFS_FREE_SPACE
-                    Delete_Ffs.Data.Data = b'\xff'*(len(Delete_Ffs.Data.Header.Encode()) + \
+                    Delete_Ffs.Data.Data = b'\xff'* (Delete_Ffs.Data.Header.HeaderLength + \
                                         len(Delete_Ffs.Data.Data))
             # if Last node not exist, the target ffs is the first ffs
             else:
@@ -776,35 +947,30 @@ def DeleteFfs(inputfile, TargetFfs_name, outputfile, Fv_name=None):
                     Delete_Ffs.Data.Name = PADVECTOR
                     Delete_Ffs.Data.Data = b'\xff'*(len(Delete_Ffs.Data.Data))
                 elif NextFfs and NextFfs.type == FFS_PAD:
-                    AppendBytes = b'\xff' * (len(NextFfs.Data.Header.Encode())) + \
+                    AppendBytes = b'\xff' * NextFfs.Data.Header.HeaderLength + \
                                     NextFfs.Data.Data + NextFfs.Data.PadData
                     AppendSize = len(AppendBytes)
                     Delete_Ffs.Data.Size += AppendSize
                     Delete_Ffs.type = FFS_PAD
                     Delete_Ffs.Data.Name = PADVECTOR
-                    Delete_Ffs.Data.Header.Size = list(Delete_Ffs.Data.Header.Size)
-                    Delete_Ffs.Data.Header.Size[0] = Delete_Ffs.Data.Size % (16**2)
-                    Delete_Ffs.Data.Header.Size[1] = Delete_Ffs.Data.Size % (16**4) //(16**2)
-                    Delete_Ffs.Data.Header.Size[2] = Delete_Ffs.Data.Size // (16**4)
-                    Delete_Ffs.Data.Header.Size = tuple(Delete_Ffs.Data.Header.Size)
+                    FmmtParser.ChangeSize(Delete_Ffs, -AppendSize)
                     Delete_Ffs.Data.Data = b'\xff' * len(Delete_Ffs.Data.Data) + AppendBytes
                     Delete_Ffs.NextRel = NextFfs.NextRel
                     NextFfs.NextRel.LastRel = Delete_Ffs
                     Delete_Fv.Child.remove(NextFfs)
                 # if the Fv only have the target ffs with content       
                 else:
-                    # Delete_Fv.type = BINARY_DATA
-                    # Delete_Fv.Data.Data = b'\xff' * Delete_Fv.Data.Size
                     if NextFfs:
                         Delete_Ffs.type = FFS_PAD
                         Delete_Ffs.Data.Name = PADVECTOR
                         Delete_Ffs.Data.Data = b'\xff' * len(Delete_Ffs.Data.Data)
                     else:
                         Delete_Ffs.type = FFS_FREE_SPACE
-                        Delete_Ffs.Data.Data = b'\xff' * (len(NextFfs.Data.Header.Encode()) + len(Delete_Ffs.Data.Data))
+                        Delete_Ffs.Data.Data = b'\xff' * (NextFfs.Data.Header.HeaderLength + len(Delete_Ffs.Data.Data))
         FmmtParser.ReCompressed(Delete_Fv)
+        FmmtParser.BinaryInfo = []
         FmmtParser.WholeFvTree.parserTree(FmmtParser.BinaryInfo)
-        SaveTreeInfo(FmmtParser.BinaryInfo, "DeleteFfs.log")
+        SaveTreeInfo(FmmtParser.BinaryInfo, "Log\Delete_{}.log".format(os.path.basename(inputfile)))
         FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)
         with open(outputfile, "wb") as f:
             f.write(FmmtParser.FinalData)
@@ -829,7 +995,7 @@ def AddNewFfs(inputfile, Fv_name, newffsfile, outputfile):
             FindSpace = True
             print(TargetFfsPad.key)
         if FindSpace:
-            Pad_len = len(TargetFfsPad.Data.Header.Encode()) + len(TargetFfsPad.Data.Data) + len(TargetFfsPad.Data.PadData)
+            Pad_len = TargetFfsPad.Data.Header.HeaderLength + len(TargetFfsPad.Data.Data) + len(TargetFfsPad.Data.PadData)
             print('Pad_len', Pad_len)
             new_ffs_len = len(new_ffs_data)
             print('new_ffs_len', new_ffs_len)
@@ -853,7 +1019,7 @@ def AddNewFfs(inputfile, Fv_name, newffsfile, outputfile):
             print("TargetFv does not have enough space for adding!")
             break
     FmmtParser.WholeFvTree.parserTree(FmmtParser.BinaryInfo)
-    SaveTreeInfo(FmmtParser.BinaryInfo, "Log\AddNewFfs.log")
+    SaveTreeInfo(FmmtParser.BinaryInfo, "Log\Add_.log".format(os.path.basename(inputfile)))
     FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)
     with open(outputfile, "wb") as f:
         f.write(FmmtParser.FinalData)
@@ -869,47 +1035,110 @@ def ReplaceFfs(inputfile, Ffs_name, newffsfile, outputfile):
     newFmmtParser = FMMTParser(newffsfile, FV_TREE)
     newFmmtParser.ParserFromRoot(newFmmtParser.WholeFvTree, new_ffs_data)
     new_ffs = newFmmtParser.WholeFvTree.Child[0]
+    new_ffs.Data.PadData = newFmmtParser.GetPadSize(new_ffs.Data.Size, 8) * b'\xff'
     FmmtParser.WholeFvTree.FindNode(Ffs_name, FmmtParser.WholeFvTree.Findlist)
-    # if FmmtParser.WholeFvTree.Findlist != []:
-    #     for TargetFfs in FmmtParser.WholeFvTree.Findlist:
-    #         if TargetFfs.NextRel.type == FFS_PAD:
-    #             if len(new_ffs.Data.Data) + len(new_ffs.Data.PadData) > (len(TargetFfs.Data.Data) + len(TargetFfs.Data.PadData) +len(TargetFfs.NextRel.Data.Data) + len(TargetFfs.NextRel.Data.PadData)):
-    #                 print('The new ffs is too large, could not replace!!')
-    #                 break
-    #             elif len(TargetFfs.Data.Data) > len(new_ffs.Data.Data):
-    #                 new_ffs.Data.Header.Size = TargetFfs.Data.Header.Size
-    #                 new_ffs.Data.Data += b'\xff'*(len(TargetFfs.Data.Data) - len(new_ffs.Data.Data))
-    #                 new_ffs.Data.PadData = TargetFfs.Data.PadData
-    #                 TargetParent = TargetFfs.Parent
-    #                 Target_index = TargetParent.Child.index(TargetFfs)
-    #                 TargetParent.remove(TargetFfs)
-    #                 TargetParent.insertChild(new_ffs, Target_index)
-    #                 FmmtParser.ReCompressed(TargetParent)
-    #             else:
-    #                 new_ffs.Data.PadData = TargetFfs.Data.PadData
-    #                 TargetParent = TargetFfs.Parent
-    #                 Target_index = TargetParent.Child.index(TargetFfs)
-    #                 TargetParent.remove(TargetFfs)
-    #                 TargetParent.insertChild(new_ffs, Target_index)
-    #                 FmmtParser.ReCompressed(TargetParent)
-    #         # if TargetFfs.NextRel.type == FFS_PAD
-    #         if len(TargetFfs.Data.Data) < len(new_ffs.Data.Data):
-    #             print('The new ffs is too large, could not replace!!')
-    #             break
-    #         else:
-    #             new_ffs.Data.Header.Size = TargetFfs.Data.Header.Size
-    #             new_ffs.Data.Data += b'\xff'*(len(TargetFfs.Data.Data) - len(new_ffs.Data.Data))
-    #             new_ffs.Data.PadData = TargetFfs.Data.PadData
-    #             TargetParent = TargetFfs.Parent
-    #             Target_index = TargetParent.Child.index(TargetFfs)
-    #             TargetParent.remove(TargetFfs)
-    #             TargetParent.insertChild(new_ffs, Target_index)
-    #             FmmtParser.ReCompressed(TargetParent)
-    # FmmtParser.WholeFvTree.parserTree(FmmtParser.BinaryInfo)
-    # SaveTreeInfo(FmmtParser.BinaryInfo, "Log\ReplaceFfs.log")
-    # FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)
-    # with open(outputfile, "wb") as f:
-    #     f.write(FmmtParser.FinalData)
+    if FmmtParser.WholeFvTree.Findlist != []:
+        for TargetFfs in FmmtParser.WholeFvTree.Findlist:
+            NextFfs = TargetFfs.NextRel
+            if NextFfs and NextFfs.type == FFS_FREE_SPACE:
+                if len(new_ffs.Data.Data) > len(TargetFfs.Data.Data) + len(TargetFfs.Data.PadData) + len(NextFfs.Data.Data):
+                    print('The new ffs is too large, could not replace!!')
+                    break
+                # new_ffs is smaller than origin ffs
+                elif len(new_ffs.Data.Data) < len(TargetFfs.Data.Data):
+                    offset_delta = len(TargetFfs.Data.Data) + len(TargetFfs.Data.PadData) - len(new_ffs.Data.Data) - len(new_ffs.Data.PadData)
+                    NextFfs.Data.Data += b'\xff'*(offset_delta)
+                    TargetParent = TargetFfs.Parent
+                    Target_index = TargetParent.Child.index(TargetFfs)
+                    TargetParent.Child.remove(TargetFfs)
+                    TargetParent.insertChild(new_ffs, Target_index)
+                    FmmtParser.ReCompressed(TargetParent)
+                elif len(TargetFfs.Data.Data) + len(TargetFfs.Data.PadData) >= len(new_ffs.Data.Data) >= len(TargetFfs.Data.Data):
+                    TargetParent = TargetFfs.Parent
+                    Target_index = TargetParent.Child.index(TargetFfs)
+                    TargetParent.Child.remove(TargetFfs)
+                    TargetParent.insertChild(new_ffs, Target_index)
+                    FmmtParser.ReCompressed(TargetParent)
+                else:
+                    offset_delta = len(new_ffs.Data.Data) + len(new_ffs.Data.PadData) - len(TargetFfs.Data.Data) - len(TargetFfs.Data.PadData)
+                    NextFfs.Data.Data = b'\xff' * (len(NextFfs.Data.Data) - offset_delta)
+                    NextFfs.Data.HOffset += offset_delta
+                    NextFfs.Data.DOffset += offset_delta
+                    TargetParent = TargetFfs.Parent
+                    Target_index = TargetParent.Child.index(TargetFfs)
+                    TargetParent.Child.remove(TargetFfs)
+                    TargetParent.insertChild(new_ffs, Target_index)
+                    FmmtParser.ReCompressed(TargetParent)
+            elif NextFfs and NextFfs.type == FFS_PAD:
+                if len(new_ffs.Data.Data) > len(TargetFfs.Data.Data) + len(TargetFfs.Data.PadData) + len(NextFfs.Data.Data) + len(NextFfs.Data.PadData):
+                    print('The new ffs is too large, could not replace!!')
+                    break
+                elif len(new_ffs.Data.Data) < len(TargetFfs.Data.Data):
+                    offset_delta = len(TargetFfs.Data.Data) + len(TargetFfs.Data.PadData) - len(new_ffs.Data.Data) - len(new_ffs.Data.PadData)
+                    NextFfs.Data.Data += b'\xff' * (offset_delta)
+                    NextFfs.Data.HOffset -= offset_delta
+                    NextFfs.Data.DOffset -= offset_delta
+                    NextFfs.Data.Size += offset_delta
+                    FmmtParser.ChangeSize(NextFfs, -offset_delta)
+                    TargetParent = TargetFfs.Parent
+                    Target_index = TargetParent.Child.index(TargetFfs)
+                    TargetParent.Child.remove(TargetFfs)
+                    TargetParent.insertChild(new_ffs, Target_index)
+                    FmmtParser.ReCompressed(TargetParent)
+                elif len(TargetFfs.Data.Data) + len(TargetFfs.Data.PadData) >= len(new_ffs.Data.Data) >= len(TargetFfs.Data.Data):
+                    print(newFmmtParser.WholeFvTree.Child[0].key)
+                    print('TargetFfs.Pad', TargetFfs.Data.PadData)
+                    print('new_ffs.Pad', new_ffs.Data.PadData)
+                    TargetParent = TargetFfs.Parent
+                    Target_index = TargetParent.Child.index(TargetFfs)
+                    TargetParent.Child.remove(TargetFfs)
+                    TargetParent.insertChild(new_ffs, Target_index)
+                    FmmtParser.ReCompressed(TargetParent)
+                else:
+                    offset_delta = len(new_ffs.Data.Data) + len(new_ffs.Data.PadData) - len(TargetFfs.Data.Data) - len(TargetFfs.Data.PadData)
+                    NextFfs.Data.Data = b'\xff' * (len(NextFfs.Data.Data) - offset_delta)
+                    NextFfs.Data.HOffset += offset_delta
+                    NextFfs.Data.DOffset += offset_delta
+                    NextFfs.Data.Size -= offset_delta
+                    FmmtParser.ChangeSize(NextFfs, offset_delta)
+                    TargetParent = TargetFfs.Parent
+                    Target_index = TargetParent.Child.index(TargetFfs)
+                    TargetParent.Child.remove(TargetFfs)
+                    TargetParent.insertChild(new_ffs, Target_index)
+                    FmmtParser.ReCompressed(TargetParent)
+            else:
+                if len(new_ffs.Data.Data) > len(TargetFfs.Data.Data) + len(TargetFfs.Data.PadData):
+                    print('The new ffs is too large, could not replace!!')
+                    break
+                elif len(new_ffs.Data.Data) > len(TargetFfs.Data.Data) + len(TargetFfs.Data.PadData) - TargetFfs.Data.Header.HeaderLength:
+                    offset_delta = len(TargetFfs.Data.Data) + len(TargetFfs.Data.PadData) - len(new_ffs.Data.Data)
+                    new_ffs.Data.Data += b'\xff' * (offset_delta)
+                    new_ffs.Data.PadData = b''
+                    new_ffs.Data.Size += offset_delta
+                    FmmtParser.ChangeSize(NextFfs, -offset_delta)
+                    TargetParent = TargetFfs.Parent
+                    Target_index = TargetParent.Child.index(TargetFfs)
+                    TargetParent.Child.remove(TargetFfs)
+                    TargetParent.insertChild(new_ffs, Target_index)
+                    FmmtParser.ReCompressed(TargetParent)
+                else:
+                    offset_delta = len(TargetFfs.Data.Data) + len(TargetFfs.Data.PadData) - len(new_ffs.Data.Data)
+                    new_ffs_pad = NODETREE(PADVECTOR)
+                    new_ffs_pad.type = FFS_PAD
+                    new_ffs_pad.Data = FfsNode(b'\xff'* offset_delta)
+                    new_ffs_pad.Data.Size = offset_delta
+                    FmmtParser.ChangeSize(NextFfs)
+                    TargetParent = TargetFfs.Parent
+                    Target_index = TargetParent.Child.index(TargetFfs)
+                    TargetParent.Child.remove(TargetFfs)
+                    TargetParent.insertChild(new_ffs, Target_index)
+                    TargetParent.insertChild(new_ffs_pad, Target_index+1)
+                    FmmtParser.ReCompressed(TargetParent)
+    FmmtParser.WholeFvTree.parserTree(FmmtParser.BinaryInfo)
+    SaveTreeInfo(FmmtParser.BinaryInfo, "Log\Replace_{}.log".format(os.path.basename(inputfile)))
+    FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)
+    with open(outputfile, "wb") as f:
+        f.write(FmmtParser.FinalData)
 
 def ExtractFfs(inputfile, Ffs_name, outputfile):
     with open(inputfile, "rb") as f:
@@ -923,7 +1152,7 @@ def ExtractFfs(inputfile, Ffs_name, outputfile):
         print(hex(TargetNode.Data.Header.Size[0]))
         print(hex(TargetNode.Data.Header.Size[1]))
         print(hex(TargetNode.Data.Header.Size[2]))
-        FinalData = TargetNode.Data.Header.Encode() + TargetNode.Data.Data
+        FinalData = struct2stream(TargetNode.Data.Header) + TargetNode.Data.Data
         with open(outputfile, "wb") as f:
             f.write(FinalData)
     else:
@@ -934,8 +1163,9 @@ def Usage():
 
 def main():
     Usage()
-    # inputfile = "Input\OVMF.fd"
-    inputfile = "Input\Platform_SPR_EBG_TXTSX_Setup.fd"
+    inputfile = "Input\OVMF.fd"
+    # inputfile = "Input\Platform_SPR_EBG_TXTSX_Setup.fd"
+    # inputfile = "Input\Storage.ffs"
     # inputfile = "Output\Output_E.ffs"
     # inputfile = "Output\Output.fd"
     # inputfile = "Input\PEIFV.Fv"
@@ -944,16 +1174,22 @@ def main():
     # inputfile = "Input\OVMF_CODE.fd"
     # inputfile = "Output\Output_D.fd"
     # NewFvfile = "Input\PEIFV.Fv"
-    # NewFfsfile = "Output\Output_E.fd"
-    ParserFile(r'Output\E_Test.ffs', r'Output\E_Test_Test.ffs', ROOT_FFS_TREE)
-    # ParserFile(inputfile, r'Output\test.fd', ROOT_TREE)
+    # NewFfsfile = "Output\Extract.ffs"
+    # ParserFile(inputfile, r'Output\Parser.fd', ROOT_TREE)
+    # ParserFile(r'Output\Output_DFfs.fd', r'Output\Parser_test.fd', ROOT_TREE)
+    # ParserFile(inputfile, r'Output\Storage_test.ffs', ROOT_FFS_TREE)
     # ExtractFfs(inputfile, uuid.UUID("003e7b41-98a2-4be2-b27a-6c30c7655225"), 'Output\E_Test.ffs')
+    # ExtractFfs(inputfile, uuid.UUID("a0c98b77-cba5-4bb8-993b-4af6ce33ece4"), 'Output\Extract_c.ffs')
+    # ExtractFfs(inputfile, uuid.UUID("df1ccef6-f301-4a63-9661-fc6030dcc880"), 'Output\Extract.ffs')
     # DeleteFfs(inputfile, uuid.UUID("df1ccef6-f301-4a63-9661-fc6030dcc880"), 'Output\Output_DFfs.fd', uuid.UUID('763bed0d-de9f-48f5-81f1-3e90e1b1a015'))
+    # DeleteFfs(inputfile, uuid.UUID("9b3ada4f-ae56-4c24-8dea-f03b7558ae50"), 'Output\Output_DFfs.fd')
+    
     # AddNewFfs('Output\Output_DFfs.fd', 'FV2', NewFfsfile, 'Output\Output_Affs.fd')
     # DeleteFv(inputfile, '763bed0d-de9f-48f5-81f1-3e90e1b1a015', 'Output\Output_D.fd')
     # DeleteFv(inputfile, 'FV2', 'Output\Output_D.fd')
     # AddNewFv(inputfile, NewFvfile, 'Output\Output_Afv.fd)
-    # ReplaceFfs()
+    ReplaceFfs(inputfile, uuid.UUID("df1ccef6-f301-4a63-9661-fc6030dcc880"), 'Output\Extract_c.ffs', 'Output\Replace.fd')
+    # ReplaceFfs('Output\Replace.fd', uuid.UUID("a0c98b77-cba5-4bb8-993b-4af6ce33ece4"), 'Output\Extract.ffs', 'Output\Replace_back.fd')
 
 if __name__ == '__main__':
     main()

@@ -1,142 +1,84 @@
 from struct import *
-import uuid
+from ctypes import *
+from PI.CommonType import *
 
+EFI_COMMON_SECTION_HEADER_LEN = 4
+EFI_COMMON_SECTION_HEADER2_LEN = 8
 
-class EFI_COMMON_SECTION_HEADER:
-    def __init__(self, buff: bytes):
-        self.buff: bytes = buff
-        self.Size: list
-        self.Type: int
-        self.Decode()
-        self.ExtHeader = None
-        self.common_head_size = 4
+class EFI_COMMON_SECTION_HEADER(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('Size',                     ARRAY(c_uint8, 3)),
+        ('Type',                     c_uint8),
+    ]
 
     @property
     def SECTION_SIZE(self):
         return self.Size[0] | self.Size[1] << 8 | self.Size[2] << 16
+    
+    def Common_Header_Size(self):
+        return 4
 
-    def Decode(self):
-        self.Size = list(unpack("<BBB", self.buff[:3]))
-        self.Type = unpack("<B", self.buff[3:4])[0]
-
-    def Encode(self) -> bytes:
-        return pack("<BBBB", self.Size[0], self.Size[1], self.Size[2], self.Type)
-
-
-class EFI_COMMON_SECTION_HEADER2:
-    def __init__(self, buff: bytes):
-        self.buff: bytes = buff
-        self.Size: list
-        self.Type: int
-        self.ExtendedSize: int
-        self.Decode()
-        self.ExtHeader = None
-        self.common_head_size = 8
+class EFI_COMMON_SECTION_HEADER2(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('Size',                     ARRAY(c_uint8, 3)),
+        ('Type',                     c_uint8),
+        ('ExtendedSize',             c_uint32),
+    ]
 
     @property
     def SECTION_SIZE(self):
         return self.ExtendedSize
-        # return self.Size[0] | self.Size[1] << 8 | self.Size[2] << 16
 
-    def Decode(self):
-        self.Size = list(unpack("<BBB", self.buff[:3]))
-        self.Type = unpack("<B", self.buff[3:4])[0]
-        self.ExtendedSize = unpack("<L", self.buff[4:8])[0]
+    def Common_Header_Size(self):
+        return 8
 
-    def Encode(self) -> bytes:
-        return pack("<BBBBL", self.Size[0], self.Size[1], self.Size[2], self.Type, self.ExtendedSize)
-
-
-class EFI_COMPRESSION_SECTION:
-    def __init__(self, buff: bytes):
-        self.buff: bytes = buff
-        self.UncompressedLength: int
-        self.CompressionType: int
-        self.Decode()
+class EFI_COMPRESSION_SECTION(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('UncompressedLength',       c_uint32),
+        ('CompressionType',          c_uint8),
+    ]
 
     def ExtHeaderSize(self):
         return 5
 
-    def Decode(self):
-        self.UncompressedLength = unpack("<L", self.buff[:4])[0]
-        self.CompressionType = unpack("<B", self.buff[4:5])[0]
-
-    def Encode(self):
-        return pack("<LB", self.UncompressedLength, self.CompressionType)
-
-
-class EFI_FREEFORM_SUBTYPE_GUID_SECTION:
-    def __init__(self, buff: bytes):
-        self.buff: bytes = buff
-        self.SubTypeGuid: bytes
-        self.SubTypeGuid_uuid: uuid.UUID
-        self.Decode()
+class EFI_FREEFORM_SUBTYPE_GUID_SECTION(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('SubTypeGuid',              GUID),
+    ]
 
     def ExtHeaderSize(self):
         return 16
 
-    def Decode(self):
-        self.SubTypeGuid = unpack("<16s", self.buff[:16])
-        self.SubTypeGuid_uuid = uuid.UUID(bytes_le=self.SubTypeGuid)
-
-    def Encode(self):
-        return pack("16s", self.SubTypeGuid)
-
-
-class EFI_GUID_DEFINED_SECTION:
-    def __init__(self, buff: bytes):
-        self.buff: bytes = buff
-        self.SectionDefinitionGuid: bytes
-        self.SectionDefinitionGuid_uuid: uuid.UUID
-        self.DataOffset: int
-        self.Attributes: int
-        self.GuidSpecificHeaderFields: bytes
-        self.Data: bytes
-        self.Decode()
+class EFI_GUID_DEFINED_SECTION(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('SectionDefinitionGuid',    GUID),
+        ('DataOffset',               c_uint16),
+        ('Attributes',               c_uint16),
+    ]
 
     def ExtHeaderSize(self):
         return 20
 
-    def Decode(self):
-        self.SectionDefinitionGuid = unpack("<16s", self.buff[:16])[0]
-        self.SectionDefinitionGuid_uuid = uuid.UUID(
-            bytes_le=self.SectionDefinitionGuid)
-        self.DataOffset = unpack("<H", self.buff[16:18])[0]
-        self.Attributes = unpack("<H", self.buff[18:20])[0]
-
-    def Encode(self):
-        return pack("<16sHH", self.SectionDefinitionGuid, self.DataOffset, self.Attributes)
-
-
-class EFI_SECTION_USER_INTERFACE():
-    def __init__(self, buff: bytes):
-        self.buff: bytes = buff
-        self.FileNameString: str
-        self.Decode()
+class EFI_SECTION_USER_INTERFACE(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('FileNameString',           c_uint16),
+    ]
 
     def ExtHeaderSize(self):
         return 2
 
-    def Decode(self):
-        self.FileNameString = self.buff[:2].decode('UTF-16-LE')
-
-    def Encode(self):
-        return self.FileNameString.encode('UTF-16-LE')
-
-
-class EFI_SECTION_VERSION:
-    def __init__(self, buff: bytes):
-        self.buff: bytes = buff
-        self.BuildNumber: int
-        self.VersionString: str
-        self.Decode()
+class EFI_SECTION_VERSION(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('BuildNumber',              c_uint16),
+        ('VersionString',            c_uint16),
+    ]
 
     def ExtHeaderSize(self):
         return 4
-
-    def Decode(self):
-        self.BuildNumber = unpack("<H", self.buff[:2])[0]
-        self.VersionString = self.buff[2:4].decode('UTF-16-LE')
-
-    def Encode(self):
-        return pack("<H", self.BuildNumber) + self.VersionString.encode('UTF-16-LE')
