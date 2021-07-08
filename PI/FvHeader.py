@@ -1,7 +1,6 @@
 from struct import *
-import uuid
 from ctypes import *
-from PI.CommonType import *
+from PI.ExtendCType import *
 
 class EFI_FIRMWARE_VOLUME_HEADER(Structure):
     _fields_ = [

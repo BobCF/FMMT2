@@ -10,67 +10,78 @@
 # Import Modules
 #
 import argparse
-import os
-import io
-import shutil
 import logging
 import sys
-import tempfile
+import re
+from core.FMMTOperation import *
 
 parser = argparse.ArgumentParser(description='''
-SplitFile creates two Binary files either in the same directory as the current working directory or in the specified directory.
+View the Binary Structure of FD/FV/Ffs/Section, and Delete/Extract/Add/Replace a Ffs from/into a FV.
 ''')
-parser.add_argument("-v", "--View", dest="InputFile",
-                    help="View each FV and the named files within each FV.")
-parser.add_argument("-d", "--split", dest="position",
-                    help="The number of bytes in the first file. The valid format are HEX, Decimal and Decimal[KMG].")
-parser.add_argument("-e", "--prefix",  dest="output",
-                    help="The output folder.")
-parser.add_argument("-a", "--firstfile",  help="The first file name")
 parser.add_argument("--version", action="version", version='%(prog)s Version 1.0',
                     help="Print debug information.")
-
-parser.add_argument("-r")
+parser.add_argument("-v", "--View", dest="View", nargs='+',
+                    help="View each FV and the named files within each FV: '-v inputfile outputfile, inputfiletype(.Fd/.Fv/.ffs/.sec)'")
+parser.add_argument("-d", "--Delete", dest="Delete", nargs='+',
+                    help="Delete a Ffs from FV: '-d inputfile TargetFfsName outputfile TargetFvName(Optional)'")
+parser.add_argument("-e", "--Extract", dest="Extract", nargs='+',
+                    help="Extract a Ffs Info: '-e inputfile TargetFfsName outputfile'")
+parser.add_argument("-a", "--Add", dest="Add", nargs='+',
+                    help="Add a Ffs into a FV:'-a inputfile TargetFvName newffsfile outputfile'")
+parser.add_argument("-r", "--Replace", dest="Replace", nargs='+',
+                    help="Replace a Ffs in a FV: '-r inputfile TargetFfsName newffsfile outputfile'")
 
 class FMMT():
     def __init__(self):
-        self.firmware_packet = None
+        self.firmware_packet = {}
+    
+    def View(self, ParaList):
+        # ParserFile(inputfile, outputfile, ROOT_TYPE)
+        filetype = os.path.splitext(ParaList[0])[1]
+        print(filetype)
+        if re.search(filetype, '.Fd', re.IGNORECASE):
+            ROOT_TYPE = ROOT_TREE
+        elif re.search(filetype, '.Fv', re.IGNORECASE):
+            ROOT_TYPE = ROOT_FV_TREE
+        elif re.search(filetype, '.ffs', re.IGNORECASE):
+            ROOT_TYPE = ROOT_FFS_TREE
+        elif re.search(filetype, '.sec', re.IGNORECASE):
+            ROOT_TYPE = ROOT_SECTION_TREE
+        else:
+            ROOT_TYPE = ROOT_TREE
+        ParserFile(ParaList[0], ParaList[1], ROOT_TYPE)
 
-    def load(self, fv_file):
-        with open(fv_file, "rb") as fd:
-            buffer = fd.read()
-        self.firmware_packet = FirmwarePacket(buffer)
-        self.firmware_packet.unpack()
+    def Delete(self, ParaList):
+        # DeleteFfs(inputfile, TargetFfs_name, outputfile, Fv_name=None)
+        if len(ParaList) == 4:
+            if len(ParaList[1]) == 36:
+                DeleteFfs(ParaList[0], uuid.UUID(ParaList[1]), ParaList[2], uuid.UUID(ParaList[3]))
+            else:
+                DeleteFfs(ParaList[0], ParaList[1], ParaList[2], uuid.UUID(ParaList[3]))
+        else:
+            DeleteFfs(ParaList[0], ParaList[1], ParaList[2])
 
-    def insert(self, fvid, ffspath):
-        fv_node = self.firmware_packet.search(fvid)
-        Ffs_handler = FirmwareFile(fv_node)
-        with open(ffspath, 'rb') as fd:
-            ffsbuffer = fd.read()
-        ffs_node = FwNode(Ffs_handler.decode(ffsbuffer))
-        self.firmware_packet.insert(fv_node, ffs_node)
-        self.firmware_packet.flush()
+    def Extract(self, ParaList):
+        # ExtractFfs(inputfile, Ffs_name, outputfile)
+        if len(ParaList[1]) == 36:
+            ExtractFfs(ParaList[0], uuid.UUID(ParaList[1]), ParaList[2])
+        else:
+            ExtractFfs(ParaList[0], ParaList[1], ParaList[2])
 
-    def delete(self, fvid, ffsname):
-        fv_node = self.firmware_packet.search(fvid)
-        self.firmware_packet.delete(fv_node, ffsname)
-        self.firmware_packet.flush()
+    def Add(self, ParaList):
+        # AddNewFfs(inputfile, Fv_name, newffsfile, outputfile)
+        AddNewFfs(ParaList[0], uuid.UUID(ParaList[1]), ParaList[2], ParaList[3])
 
-    def update(self, fvid, oldffsname, newffspath):
-        fv_node = self.firmware_packet.search(fvid)
-        with open(newffspath, 'rb') as fd:
-            ffsbuffer = fd.read()
-        Ffs_handler = FirmwareFile(fv_node)
-        ffs_node = FwNode(Ffs_handler.decode(ffsbuffer))
-        self.firmware_packet.update(fv_node, oldffsname, ffs_node)
-        self.firmware_packet.flush()
-
-    def view(self):
-        self.firmware_packet.view()
-
+    def Replace(self, ParaList):
+        # ReplaceFfs(inputfile, Ffs_name, newffsfile, outputfile)
+        if len(ParaList[1]) == 36:
+            ReplaceFfs(ParaList[0], uuid.UUID(ParaList[1]), ParaList[2], ParaList[3])
+        else:
+            ReplaceFfs(ParaList[0], ParaList[1], ParaList[2], ParaList[3])
 
 def main():
     args = parser.parse_args()
+    print(args)
     status = 0
 
     logger = logging.getLogger('FMMT')
@@ -83,7 +94,17 @@ def main():
 
     try:
         fmmt = FMMT()
-        fmmt.load("OVMF.fd")
+        if args.View:
+            fmmt.View(args.View)
+        if args.Delete:
+            fmmt.Delete(args.Delete)
+        if args.Extract:
+            print(args.Extract)
+            fmmt.Extract(args.Extract)
+        if args.Add:
+            fmmt.Add(args.Add)
+        if args.Replace:
+            fmmt.Replace(args.Replace)
         # TODO:
         '''Do the main work'''
     except Exception as e:

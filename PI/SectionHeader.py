@@ -1,6 +1,6 @@
 from struct import *
 from ctypes import *
-from PI.CommonType import *
+from PI.ExtendCType import *
 
 EFI_COMMON_SECTION_HEADER_LEN = 4
 EFI_COMMON_SECTION_HEADER2_LEN = 8
@@ -64,21 +64,43 @@ class EFI_GUID_DEFINED_SECTION(Structure):
     def ExtHeaderSize(self):
         return 20
 
-class EFI_SECTION_USER_INTERFACE(Structure):
-    _pack_ = 1
-    _fields_ = [
-        ('FileNameString',           c_uint16),
-    ]
+def Get_USER_INTERFACE_Header(nums):
+    class EFI_SECTION_USER_INTERFACE(Structure):
+        _pack_ = 1
+        _fields_ = [
+            ('FileNameString',       ARRAY(c_uint16, nums)),
+        ]
 
-    def ExtHeaderSize(self):
-        return 2
+        def ExtHeaderSize(self):
+            return 2 * nums
 
-class EFI_SECTION_VERSION(Structure):
-    _pack_ = 1
-    _fields_ = [
-        ('BuildNumber',              c_uint16),
-        ('VersionString',            c_uint16),
-    ]
+        def GetUiString(self):
+            UiString = ''
+            for i in range(nums):
+                print('self.FileNameString[i]', self.FileNameString[i])
+                if self.FileNameString[i]:
+                    UiString += chr(self.FileNameString[i])
+            return UiString
 
-    def ExtHeaderSize(self):
-        return 4
+    return EFI_SECTION_USER_INTERFACE
+
+def Get_VERSION_Header(nums):
+    class EFI_SECTION_VERSION(Structure):
+        _pack_ = 1
+        _fields_ = [
+            ('BuildNumber',          c_uint16),
+            ('VersionString',        ARRAY(c_uint16, nums)),
+        ]
+
+        def ExtHeaderSize(self):
+            return 2 * (nums+1)
+
+        def GetVersionString(self):
+            VersionString = ''
+            for i in range(nums):
+                print('self.VersionString[i]', self.VersionString[i])
+                if self.VersionString[i]:
+                    VersionString += chr(self.VersionString[i])
+            return VersionString
+
+    return EFI_SECTION_VERSION

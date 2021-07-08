@@ -1,7 +1,6 @@
 from struct import *
 from ctypes import *
-import uuid
-from PI.CommonType import *
+from PI.ExtendCType import *
 
 EFI_FFS_FILE_HEADER_LEN = 24
 EFI_FFS_FILE_HEADER2_LEN = 32

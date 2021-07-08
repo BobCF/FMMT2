@@ -5,7 +5,7 @@ import shutil
 import sys
 import tempfile
 import uuid
-from PI.CommonType import *
+from PI.ExtendCType import *
 
 
 logger = logging.getLogger("Section Type")
