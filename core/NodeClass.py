@@ -40,28 +40,35 @@ class FvNode:
             self.ExtHeader = EFI_FIRMWARE_VOLUME_EXT_HEADER.from_buffer_copy(buffer[self.Header.ExtHeaderOffset:])
             self.Name =  uuid.UUID(bytes_le=struct2stream(self.ExtHeader.FvName))
         self.Size = self.Header.FvLength
+        self.HeaderLength = self.Header.HeaderLength
         self.HOffset = 0
         self.DOffset = 0
         self.ROffset = 0
         self.Data = b''
-        if self.Header.Signature != b'_FVH':
-            print('Error Fv Header!!')
+        if self.Header.Signature != 1213613663:
+            print(self.Header.Signature)
+            with open(str(self.Name)+'.fd', "wb") as f:
+                f.write(struct2stream(self.Header))
+            assert False
         self.PadData = b''
+        self.Free_Space = 0
 
     def ModCheckSum(self):
         pass
 
 class FfsNode:
     def __init__(self, buffer: bytes):
-        self.Attributes = unpack("<B", buffer[19:20])[0]
-        if self.Attributes != 0x01:
-            self.Header = EFI_FFS_FILE_HEADER.from_buffer_copy(buffer)
-        else:
+        self.Header = EFI_FFS_FILE_HEADER.from_buffer_copy(buffer)
+        # self.Attributes = unpack("<B", buffer[21:22])[0]
+        if self.Header.Size != 0 and self.Header.Attributes == 0x01:
+            print('Error Ffs Header!')
+        if self.Header.Size == 0 and self.Header.Attributes == 0x01:
             self.Header = EFI_FFS_FILE_HEADER2.from_buffer_copy(buffer)
         self.Name = uuid.UUID(bytes_le=struct2stream(self.Header.Name))
         self.UiName = b''
         self.Version = b''
         self.Size = self.Header.FFS_FILE_SIZE
+        self.HeaderLength = self.Header.HeaderLength
         self.HOffset = 0
         self.DOffset = 0
         self.ROffset = 0

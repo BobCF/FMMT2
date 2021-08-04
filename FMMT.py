@@ -35,6 +35,12 @@ class FMMT():
     def __init__(self):
         self.firmware_packet = {}
     
+    def CheckFfsName(self, FfsName):
+        if len(FfsName) == 36:
+            return uuid.UUID(FfsName)
+        else:
+            return FfsName
+
     def View(self, ParaList):
         # ParserFile(inputfile, outputfile, ROOT_TYPE)
         filetype = os.path.splitext(ParaList[0])[1]
@@ -49,35 +55,32 @@ class FMMT():
             ROOT_TYPE = ROOT_SECTION_TREE
         else:
             ROOT_TYPE = ROOT_TREE
-        ParserFile(ParaList[0], ParaList[1], ROOT_TYPE)
+        if len(ParaList) == 2:
+            ParserFile(ParaList[0], ParaList[1], ROOT_TYPE)
+        else:
+            ParserFile(ParaList[0], None, ROOT_TYPE)
 
     def Delete(self, ParaList):
         # DeleteFfs(inputfile, TargetFfs_name, outputfile, Fv_name=None)
         if len(ParaList) == 4:
-            if len(ParaList[1]) == 36:
-                DeleteFfs(ParaList[0], uuid.UUID(ParaList[1]), ParaList[2], uuid.UUID(ParaList[3]))
-            else:
-                DeleteFfs(ParaList[0], ParaList[1], ParaList[2], uuid.UUID(ParaList[3]))
+            DeleteFfs(ParaList[0], self.CheckFfsName(ParaList[1]), ParaList[2], uuid.UUID(ParaList[3]))
         else:
-            DeleteFfs(ParaList[0], ParaList[1], ParaList[2])
+            DeleteFfs(ParaList[0], self.CheckFfsName(ParaList[1]), ParaList[2])
 
     def Extract(self, ParaList):
         # ExtractFfs(inputfile, Ffs_name, outputfile)
-        if len(ParaList[1]) == 36:
-            ExtractFfs(ParaList[0], uuid.UUID(ParaList[1]), ParaList[2])
-        else:
-            ExtractFfs(ParaList[0], ParaList[1], ParaList[2])
+        ExtractFfs(ParaList[0], self.CheckFfsName(ParaList[1]), ParaList[2])
 
     def Add(self, ParaList):
         # AddNewFfs(inputfile, Fv_name, newffsfile, outputfile)
-        AddNewFfs(ParaList[0], uuid.UUID(ParaList[1]), ParaList[2], ParaList[3])
+        AddNewFfs(ParaList[0], self.CheckFfsName(ParaList[1]), ParaList[2], ParaList[3])
 
     def Replace(self, ParaList):
-        # ReplaceFfs(inputfile, Ffs_name, newffsfile, outputfile)
-        if len(ParaList[1]) == 36:
-            ReplaceFfs(ParaList[0], uuid.UUID(ParaList[1]), ParaList[2], ParaList[3])
+        # ReplaceFfs(inputfile, Ffs_name, newffsfile, outputfile, Fv_name=None)
+        if len(ParaList) == 5:
+            ReplaceFfs(ParaList[0], self.CheckFfsName(ParaList[1]), ParaList[2], ParaList[3], uuid.UUID(ParaList[4]))
         else:
-            ReplaceFfs(ParaList[0], ParaList[1], ParaList[2], ParaList[3])
+            ReplaceFfs(ParaList[0], self.CheckFfsName(ParaList[1]), ParaList[2], ParaList[3])
 
 def main():
     args = parser.parse_args()

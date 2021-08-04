@@ -38,32 +38,40 @@ class FMMTParser:
         temp_save_child = TargetTree.Child
         with open('Output\Add_Child_{}.ffs'.format(pos), "wb") as f:
             for item in temp_save_child:
-                if item.type == SECTION_TREE and item.Data.ExtHeader:
-                    f.write(struct2stream(item.Data.Header)+ struct2stream(item.Data.ExtHeader) + item.Data.Data + item.Data.PadData)
-                    NewData += struct2stream(item.Data.Header) + struct2stream(item.Data.ExtHeader) + item.Data.Data + item.Data.PadData
+                if item.type == SECTION_TREE and not item.Data.OriData and item.Data.ExtHeader:
+                      NewData += struct2stream(item.Data.Header) + struct2stream(item.Data.ExtHeader) + item.Data.Data + item.Data.PadData
+                elif item.type == SECTION_TREE and item.Data.OriData and not item.Data.ExtHeader:
+                    NewData += struct2stream(item.Data.Header) + item.Data.OriData + item.Data.PadData
+                elif item.type == SECTION_TREE and item.Data.OriData and item.Data.ExtHeader:
+                    NewData += struct2stream(item.Data.Header) + struct2stream(item.Data.ExtHeader) + item.Data.OriData + item.Data.PadData
+                elif item.type == FFS_FREE_SPACE:
+                    NewData += item.Data.Data + item.Data.PadData
                 else:
-                    f.write(struct2stream(item.Data.Header) + item.Data.Data + item.Data.PadData)
                     NewData += struct2stream(item.Data.Header) + item.Data.Data + item.Data.PadData
+            f.write(NewData)
         if TargetTree.Data:
             with open('Output\Sec_ori_{}.ffs'.format(pos), "wb") as f:
-                f.write(TargetTree.Data.Data)           
+                f.write(TargetTree.Data.Data)
             print('Ori TargetTree.Data.Data', len(TargetTree.Data.Data))
             TargetTree.Data.Data = NewData
             with open('Output\Sec_new_{}.ffs'.format(pos), "wb") as f:
                 f.write(TargetTree.Data.Data)
             print('length of current FinalData\n', len(TargetTree.Data.Data))
         if GuidTool:
-            guidtool = GUIDTools(r'FMMTConfig.ini').__getitem__(GuidTool)
+            ParPath = os.path.abspath(os.path.dirname(os.path.abspath(__file__))+os.path.sep+"..")
+            ToolPath = os.path.join(ParPath, r'FMMTConfig.ini')
+            print('GuidTool:',  struct2stream(GuidTool))
+            guidtool = GUIDTools(ToolPath).__getitem__(struct2stream(GuidTool))
             print('len(TargetTree.Data.OriData)', len(TargetTree.Data.OriData))
             CompressedData = guidtool.pack(TargetTree.Data.Data)
-
+            print('len(CompressedData)', len(CompressedData))
             if len(CompressedData) < len(TargetTree.Data.OriData):
                 size_delta = len(TargetTree.Data.OriData) - len(CompressedData)
                 print('TargetTree.Size', hex(TargetTree.Data.Size))
                 ChangeSize(TargetTree, size_delta)
                 print('Changed TargetTree.Size', hex(TargetTree.Data.Size))
                 OriPad_Size = len(TargetTree.Data.PadData)
-                NewPad_Size = GetPadSize(TargetTree.Data.Size, 4)
+                NewPad_Size = GetPadSize(TargetTree.Data.Header.SECTION_SIZE, 4)
                 TargetTree.Data.PadData = NewPad_Size * b'\x00'
                 TargetTree.Data.OriData = CompressedData
                 print('len(TargetTree.Data.Data)', len(TargetTree.Data.Data))
@@ -77,8 +85,8 @@ class FMMTParser:
                 Tar_Parent = TargetTree.Parent
                 NextFfs = Tar_Parent.NextRel
                 print('Tar_Parent', Tar_Parent.Data.Name)
-                print('NextFfs', NextFfs.Data.Name)
-                if NextFfs.type == FFS_PAD:
+#                 print('NextFfs', NextFfs.Data.Name)
+                if NextFfs and NextFfs.type == FFS_PAD:
                     ChangeSize(Tar_Parent, offset_delta)
                     Tar_Parent_Ori_Pad = len(Tar_Parent.Data.PadData)
                     Tar_Parent_New_Pad = GetPadSize(Tar_Parent.Data.Size, 8)
@@ -90,7 +98,7 @@ class FMMTParser:
                     NextFfs.Data.Data += ffs_offset_delta * b'\xff'
                     # NextFfs.Data.Size += ffs_offset_delta
                     ChangeSize(NextFfs, -ffs_offset_delta)
-                elif NextFfs.type == FFS_FREE_SPACE:
+                elif NextFfs and NextFfs.type == FFS_FREE_SPACE:
                     # Tar_Parent.Data.Size -= offset_delta
                     ChangeSize(Tar_Parent, offset_delta)
                     Tar_Parent_Ori_Pad = len(Tar_Parent.Data.PadData)
@@ -101,7 +109,7 @@ class FMMTParser:
                     NextFfs.Data.DOffset -= ffs_offset_delta
                     NextFfs.Data.Data += ffs_offset_delta * b'\xff'
                 else:
-                    if offset_delta >= Tar_Parent.Data.Header.HeaderLength:
+                    if Tar_Parent.type == FFS_TREE and offset_delta >= Tar_Parent.Data.Header.HeaderLength:
                         ChangeSize(Tar_Parent, offset_delta)
                         Tar_Parent_Ori_Pad = len(Tar_Parent.Data.PadData)
                         Tar_Parent_New_Pad = GetPadSize(Tar_Parent.Data.Size, 8)
@@ -115,7 +123,11 @@ class FMMTParser:
                         Target_index = Tar_Parent.Parent.Child.index(NextFfs)
                         Tar_Parent.Parent.insertChild(new_ffs_pad, Target_index)
                     else:
+                        print('SoSo')
                         TargetTree.Data.PadData += offset_delta * b'\x00'
+            elif len(CompressedData) == len(TargetTree.Data.OriData):
+                print('Same Length!')
+                TargetTree.Data.OriData = CompressedData
             elif len(CompressedData) > len(TargetTree.Data.OriData):
                 size_delta = len(CompressedData) - len(TargetTree.Data.OriData)
                 ChangeSize(TargetTree, -size_delta)
@@ -175,6 +187,7 @@ class FMMTParser:
     ## Parser the nodes in WholeTree.
     def ParserFromRoot(self, WholeFvTree=None, whole_data=b'', Reloffset = 0):
         if WholeFvTree.type == ROOT_TREE or WholeFvTree.type == ROOT_FV_TREE:
+            print('ROOT Tree: ', WholeFvTree.type)
             ParserEntry().DataParser(self.WholeFvTree, whole_data, Reloffset)
         else:
             ParserEntry().DataParser(WholeFvTree, whole_data, Reloffset)

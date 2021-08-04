@@ -109,6 +109,9 @@ class NODETREE:
         elif self.type == FFS_TREE:
             print("{}Name:{}  UiName:{}  Version:{}  Type:{}  Size:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.Data.UiName, self.Data.Version, self.type, hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
             TreeInfo.append("{}Name:{}  UiName:{}  Version:{}  Type:{}  Size:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.Data.UiName, self.Data.Version, self.type, hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
+        elif self.type == SECTION_TREE and self.Data.Type == 0x02:
+            print("{}Name:{}  Type:{}  Size:{}  DecompressedSize:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.type, hex(len(self.Data.OriData)), hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
+            TreeInfo.append("{}Name:{}  Type:{}  Size:{}  DecompressedSize:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.type, hex(len(self.Data.OriData)), hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
         elif self is not None:
             print("{}Name:{}  Type:{}  Size:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.type, hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
             TreeInfo.append("{}Name:{}  Type:{}  Size:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.type, hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))

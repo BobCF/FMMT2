@@ -15,7 +15,21 @@ lf = logging.Formatter("%(asctime)s- %(levelname)-8s: %(message)s")
 lh.setFormatter(lf)
 logger.addHandler(lh)
 
-
+def ModifyGuidFormat(target_guid):
+    target_guid = target_guid.replace('-', '')
+    # print('target_guid', target_guid)
+    target_list = []
+    start = [0,8,12,16,18,20,22,24,26,28,30]
+    end = [8,12,16,18,20,22,24,26,28,30,32]
+    num = len(start)
+    for pos in range(num):
+        new_value = int(target_guid[start[pos]:end[pos]], 16)
+        target_list.append(new_value)
+    # print('target_list', target_list)
+    new_format = GUID()
+    new_format.from_list(target_list)
+    # print('new_format', new_format)
+    return new_format
 
 class GUIDTool:
     def __init__(self, guid, short_name, command):
@@ -38,7 +52,9 @@ class GUIDTool:
                 file.close()
                 command = [tool, '-e', '-o', ToolOuputFile,
                                   ToolInputFile]
+                print('command_start', command)
                 os.system(' '.join(command))
+                print('command_end', command)
                 buf = open(ToolOuputFile, "rb")
                 res_buffer = buf.read()
             except Exception as msg:
@@ -46,6 +62,7 @@ class GUIDTool:
                 return ""
             else:
                 buf.close()
+                print('Before remove!')
                 if os.path.exists(tmp):
                     shutil.rmtree(tmp)
                 return res_buffer
@@ -71,7 +88,9 @@ class GUIDTool:
                 file.write(buffer)
                 file.close()
                 command = [tool, '-d', '-o', ToolOuputFile, ToolInputFile]
+                print('command_start', command)
                 os.system(' '.join(command))
+                print('command_end', command)
                 buf = open(ToolOuputFile, "rb")
                 res_buffer = buf.read()
             except Exception as msg:
@@ -79,6 +98,7 @@ class GUIDTool:
                 return ""
             else:
                 buf.close()
+                print('Before remove!')
                 if os.path.exists(tmp):
                     shutil.rmtree(tmp)
                 return res_buffer
@@ -146,22 +166,6 @@ class GUIDTools:
         self.tooldef = dict()
         self.load()
 
-    def ModifyGuidFormat(self, target_guid):
-        target_guid = target_guid.replace('-', '')
-        print('target_guid', target_guid)
-        target_list = []
-        start = [0,8,12,16,18,20,22,24,26,28,30]
-        end = [8,12,16,18,20,22,24,26,28,30,32]
-        num = len(start)
-        for pos in range(num):
-            new_value = int(target_guid[start[pos]:end[pos]], 16)
-            target_list.append(new_value)
-        print('target_list', target_list)
-        new_format = GUID()
-        new_format.from_list(target_list)
-        print('new_format', new_format)
-        return struct2stream(new_format)
-
     def VerifyTools(self):
         """
         Verify Tools and Update Tools path.
@@ -190,7 +194,7 @@ class GUIDTools:
                 try:
                     guid, short_name, command = line.split()
                     print('guid.strip()', guid.strip())
-                    new_format_guid = self.ModifyGuidFormat(guid.strip())
+                    new_format_guid = struct2stream(ModifyGuidFormat(guid.strip()))
                     print('new_format_guid', new_format_guid)
                     self.tooldef[new_format_guid] = GUIDTool(
                         guid.strip(), short_name.strip(), command.strip())
@@ -204,6 +208,7 @@ class GUIDTools:
         # self.UpdateTools()
 
     def __getitem__(self, guid):
+        print('self.tooldef', self.tooldef)
         return self.tooldef.get(guid)
 
 

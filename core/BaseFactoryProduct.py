@@ -29,7 +29,10 @@ class BinaryFactory():
 class BinaryProduct():
     ## Use GuidTool to decompress data.
     def DeCompressData(self, GuidTool, Section_Data):
-        guidtool = GUIDTools(r'FMMTConfig.ini').__getitem__(struct2stream(GuidTool))
+        ParPath = os.path.abspath(os.path.dirname(os.path.abspath(__file__))+os.path.sep+"..")
+        ToolPath = os.path.join(ParPath, r'FMMTConfig.ini')
+        print('struct2stream(GuidTool)', struct2stream(GuidTool))
+        guidtool = GUIDTools(ToolPath).__getitem__(struct2stream(GuidTool))
         DecompressedData = guidtool.unpack(Section_Data)
         return DecompressedData
 
