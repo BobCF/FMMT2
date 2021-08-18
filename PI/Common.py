@@ -1,4 +1,4 @@
-from core.NodeTree import SECTION_TREE
+from core.NodeTree import SECTION_TREE, FV_TREE
 from core.GuidTools import ModifyGuidFormat
 import uuid
 from PI.SectionHeader import EFI_COMMON_SECTION_HEADER2
@@ -81,5 +81,9 @@ def ModifyFfsType(TargetFfs):
             if NeedChange:
                 TargetFfs.Parent.Data.Header.FileSystemGuid = ModifyGuidFormat("8c8ce578-8a3d-4f1c-9935-896185c32dd3")
 
-    if type(TargetFfs.Data.Header) == type(EFI_FFS_FILE_HEADER2()) and struct2stream(TargetFfs.Parent.Data.Header.FileSystemGuid) == EFI_FIRMWARE_FILE_SYSTEM2_GUID_BYTE:
-        TargetFfs.Parent.Data.Header.FileSystemGuid = ModifyGuidFormat("5473C07A-3DCB-4dca-BD6F-1E9689E7349A")
+    if type(TargetFfs.Data.Header) == type(EFI_FFS_FILE_HEADER2()):
+        TarParent = TargetFfs.Parent
+        while TarParent:
+            if TarParent.type == FV_TREE and struct2stream(TarParent.Data.Header.FileSystemGuid) == EFI_FIRMWARE_FILE_SYSTEM2_GUID_BYTE:
+                TarParent.Data.Header.FileSystemGuid = ModifyGuidFormat("5473C07A-3DCB-4dca-BD6F-1E9689E7349A")
+            TarParent = TarParent.Parent

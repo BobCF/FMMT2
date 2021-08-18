@@ -77,10 +77,10 @@ class FMMTParser:
                 print('len(TargetTree.Data.Data)', len(TargetTree.Data.Data))
                 print('len(CompressedData)', len(CompressedData))
                 offset_delta = size_delta + OriPad_Size - NewPad_Size
-                while TargetTree.NextRel:
-                    TargetTree.NextRel.Data.HOffset -= offset_delta
-                    TargetTree.NextRel.Data.DOffset -= offset_delta
-                    TargetTree = TargetTree.NextRel
+                # while TargetTree.NextRel:
+                #     TargetTree.NextRel.Data.HOffset -= offset_delta
+                #     TargetTree.NextRel.Data.DOffset -= offset_delta
+                #     TargetTree = TargetTree.NextRel
                 # TargetTree.Data.PadData += offset_delta * b'\xff'
                 Tar_Parent = TargetTree.Parent
                 NextFfs = Tar_Parent.NextRel
@@ -92,9 +92,9 @@ class FMMTParser:
                     Tar_Parent_New_Pad = GetPadSize(Tar_Parent.Data.Size, 8)
                     Tar_Parent.Data.PadData =  Tar_Parent_New_Pad * b'\xff'
                     ffs_offset_delta = offset_delta - Tar_Parent_New_Pad + Tar_Parent_Ori_Pad
-                    NextFfs.Data.HOffset -= ffs_offset_delta
-                    NextFfs.Data.DOffset -= ffs_offset_delta
-                    print('NextFfs.Data.HOffset', NextFfs.Data.HOffset)
+                    # NextFfs.Data.HOffset -= ffs_offset_delta
+                    # NextFfs.Data.DOffset -= ffs_offset_delta
+                    # print('NextFfs.Data.HOffset', NextFfs.Data.HOffset)
                     NextFfs.Data.Data += ffs_offset_delta * b'\xff'
                     # NextFfs.Data.Size += ffs_offset_delta
                     ChangeSize(NextFfs, -ffs_offset_delta)
@@ -105,8 +105,8 @@ class FMMTParser:
                     Tar_Parent_New_Pad = GetPadSize(Tar_Parent.Data.Size, 8)
                     Tar_Parent.Data.PadData =  Tar_Parent_New_Pad * b'\xff'
                     ffs_offset_delta = offset_delta - Tar_Parent_New_Pad + Tar_Parent_Ori_Pad
-                    NextFfs.Data.HOffset -= ffs_offset_delta
-                    NextFfs.Data.DOffset -= ffs_offset_delta
+                    # NextFfs.Data.HOffset -= ffs_offset_delta
+                    # NextFfs.Data.DOffset -= ffs_offset_delta
                     NextFfs.Data.Data += ffs_offset_delta * b'\xff'
                 else:
                     if Tar_Parent.type == FFS_TREE and offset_delta >= Tar_Parent.Data.Header.HeaderLength:
@@ -139,37 +139,37 @@ class FMMTParser:
                 Tar_Parent = TargetTree.Parent
                 NextFfs = Tar_Parent.NextRel
                 if NextFfs.type == FFS_FREE_SPACE and offset_delta <= len(NextFfs.Data.Data):
-                    while TargetTree.NextRel:
-                        TargetTree.NextRel.Data.HOffset += offset_delta
-                        TargetTree.NextRel.Data.DOffset += offset_delta
-                        TargetTree = TargetTree.NextRel
+                    # while TargetTree.NextRel:
+                    #     TargetTree.NextRel.Data.HOffset += offset_delta
+                    #     TargetTree.NextRel.Data.DOffset += offset_delta
+                    #     TargetTree = TargetTree.NextRel
                     ChangeSize(Tar_Parent, -offset_delta)
                     Tar_Parent_Ori_Pad = len(Tar_Parent.Data.PadData)
                     Tar_Parent_New_Pad = GetPadSize(Tar_Parent.Data.Size, 8)
                     Tar_Parent.Data.PadData =  Tar_Parent_New_Pad * b'\xff'
                     ffs_offset_delta = offset_delta + Tar_Parent_New_Pad - Tar_Parent_Ori_Pad
-                    NextFfs.Data.HOffset += ffs_offset_delta
-                    NextFfs.Data.DOffset += ffs_offset_delta
+                    # NextFfs.Data.HOffset += ffs_offset_delta
+                    # NextFfs.Data.DOffset += ffs_offset_delta
                     NextFfs.Data.Data = (len(NextFfs.Data.Data) - ffs_offset_delta) * b'\xff'
                 elif NextFfs.type == FFS_PAD and offset_delta <= NextFfs.Data.Size + len(NextFfs.Data.PadData)- NextFfs.Data.Header.HeaderLength:
-                    while TargetTree.NextRel:
-                        TargetTree.NextRel.Data.HOffset += offset_delta
-                        TargetTree.NextRel.Data.DOffset += offset_delta
-                        TargetTree = TargetTree.NextRel
+                    # while TargetTree.NextRel:
+                    #     TargetTree.NextRel.Data.HOffset += offset_delta
+                    #     TargetTree.NextRel.Data.DOffset += offset_delta
+                    #     TargetTree = TargetTree.NextRel
                     ChangeSize(Tar_Parent, -offset_delta)
                     Tar_Parent_Ori_Pad = len(Tar_Parent.Data.PadData)
                     Tar_Parent_New_Pad = GetPadSize(Tar_Parent.Data.Size, 8)
                     Tar_Parent.Data.PadData =  Tar_Parent_New_Pad * b'\xff'
                     ffs_offset_delta = offset_delta + Tar_Parent_New_Pad - Tar_Parent_Ori_Pad
-                    NextFfs.Data.HOffset += ffs_offset_delta
-                    NextFfs.Data.DOffset += ffs_offset_delta
+                    # NextFfs.Data.HOffset += ffs_offset_delta
+                    # NextFfs.Data.DOffset += ffs_offset_delta
                     ChangeSize(NextFfs, ffs_offset_delta)
                     NextFfs.Data.Data = NextFfs.Data.Data[:NextFfs.Data.Size]
                 elif NextFfs.type == FFS_PAD and offset_delta <= (NextFfs.Data.Size + len(NextFfs.Data.PadData)):
-                    while TargetTree.NextRel:
-                        TargetTree.NextRel.Data.HOffset += offset_delta
-                        TargetTree.NextRel.Data.DOffset += offset_delta
-                        TargetTree = TargetTree.NextRel
+                    # while TargetTree.NextRel:
+                    #     TargetTree.NextRel.Data.HOffset += offset_delta
+                    #     TargetTree.NextRel.Data.DOffset += offset_delta
+                    #     TargetTree = TargetTree.NextRel
                     ChangeSize(Tar_Parent, -NextFfs.Data.Size)
                     Tar_Parent_Ori_Pad = len(Tar_Parent.Data.PadData)
                     Tar_Parent_New_Pad = GetPadSize(Tar_Parent.Data.Size, 8)

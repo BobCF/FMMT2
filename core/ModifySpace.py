@@ -116,258 +116,53 @@ class FfsMofify:
             self.Status = True
 
     def ReplaceFfs(self):
-        NextFfs = self.TargetFfs.NextRel
-        TargetParent = self.TargetFfs.Parent
-        if NextFfs and NextFfs.type == FFS_FREE_SPACE:
-            # Current Fv Free space is not enough for new Ffs, need to check parent Fv
-            if len(self.NewFfs.Data.Data) > len(self.TargetFfs.Data.Data) + len(self.TargetFfs.Data.PadData) + len(NextFfs.Data.Data):
-                Needed_Space = len(self.NewFfs.Data.Data) - len(self.TargetFfs.Data.Data) - len(self.TargetFfs.Data.PadData) - len(NextFfs.Data.Data)
-                TargetParent.Child.remove(self.TargetFfs)
-                New_Add_Len = BlockSize - Needed_Space%BlockSize
-                if New_Add_Len % BlockSize:
-                    NextFfs.Data.Data = b'\xff' * New_Add_Len
-                    Needed_Space += New_Add_Len
-                    TargetParent.insertChild(self.NewFfs, len(TargetParent.Child)-1)
-                else:
-                    TargetParent.Child.remove(NextFfs)
-                    TargetParent.insertChild(self.NewFfs, -1)
-                ModifyFfsType(self.NewFfs)
-                TargetParent.Data.Data = b''
-                for item in TargetParent.Child:
-                    if item.type == FFS_FREE_SPACE:
-                        TargetParent.Data.Data += item.Data.Data + item.Data.PadData
-                    else:
-                        TargetParent.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
-                TargetParent.Data.Size += Needed_Space
-                TargetParent.Data.Header.FvLength = TargetParent.Data.Size
-                self.ModifyTest(TargetParent.Parent, Needed_Space)
-            # self.NewFfs is smaller than origin ffs
-            elif len(self.NewFfs.Data.Data) <= len(self.TargetFfs.Data.Data):
-                offset_delta = len(self.TargetFfs.Data.Data) + len(self.TargetFfs.Data.PadData) - len(self.NewFfs.Data.Data) - len(self.NewFfs.Data.PadData)
-                NextFfs.Data.Data += b'\xff'*(offset_delta)
-                Target_index = TargetParent.Child.index(self.TargetFfs)
-                TargetParent.Child.remove(self.TargetFfs)
-                TargetParent.insertChild(self.NewFfs, Target_index)
+        TargetFv = self.TargetFfs.Parent
+        if self.NewFfs.Data.Size > self.TargetFfs.Data.Size:
+            Needed_Space = self.NewFfs.Data.Size - self.TargetFfs.Data.Size
+            if TargetFv.Data.Free_Space >= Needed_Space:
+                TargetFv.Child[-1].Data.Data = b'\xff' * (TargetFv.Data.Free_Space - Needed_Space)
+                Target_index = TargetFv.Child.index(self.TargetFfs)
+                TargetFv.Child.remove(self.TargetFfs)
+                TargetFv.insertChild(self.NewFfs, Target_index)
                 self.Status = True
-            # self.NewFfs + NewPadData == self.TargetFfs + OriPadData
-            elif len(self.TargetFfs.Data.Data) + len(self.TargetFfs.Data.PadData) >= len(self.NewFfs.Data.Data) >= len(self.TargetFfs.Data.Data):
-                Target_index = TargetParent.Child.index(self.TargetFfs)
-                TargetParent.Child.remove(self.TargetFfs)
-                TargetParent.insertChild(self.NewFfs, Target_index)
-                self.Status = True
-            # self.NewFfs larger than origin ffs but have enough space in current Fv.
             else:
-                offset_delta = len(self.NewFfs.Data.Data) + len(self.NewFfs.Data.PadData) - len(self.TargetFfs.Data.Data) - len(self.TargetFfs.Data.PadData)
-                NextFfs.Data.Data = b'\xff' * (len(NextFfs.Data.Data) - offset_delta)
-                NextFfs.Data.HOffset += offset_delta
-                NextFfs.Data.DOffset += offset_delta
-                Target_index = TargetParent.Child.index(self.TargetFfs)
-                TargetParent.Child.remove(self.TargetFfs)
-                TargetParent.insertChild(self.NewFfs, Target_index)
-                ModifyFfsType(self.NewFfs)
-                self.Status = True
-        elif NextFfs and NextFfs.type == FFS_PAD:
-            # Next FFS_PAD space is not enough for new Ffs, need to check Fv freespace
-            if len(self.NewFfs.Data.Data) > len(self.TargetFfs.Data.Data) + len(self.TargetFfs.Data.PadData) + len(NextFfs.Data.Data) + len(NextFfs.Data.PadData):
-                Needed_Space = len(self.NewFfs.Data.Data) - len(self.TargetFfs.Data.Data) - len(self.TargetFfs.Data.PadData) - len(NextFfs.Data.Data) - len(NextFfs.Data.PadData)
-                if Needed_Space < TargetParent.Data.Free_Space:
-                    FreeSpaceNode = TargetParent.Child[-1]
-                    FreeSpaceNode.Data.Data = b'\xff' * (TargetParent.Data.Free_Space - Needed_Space)
-                    Target_index = TargetParent.Child.index(self.TargetFfs)
-                    TargetParent.Child.remove(self.TargetFfs)
-                    TargetParent.insertChild(self.NewFfs, Target_index)
-                    ModifyFfsType(self.NewFfs)
-                elif Needed_Space == TargetParent.Data.Free_Space:
-                    Target_index = TargetParent.Child.index(self.TargetFfs)
-                    TargetParent.Child.remove(self.TargetFfs)
-                    TargetParent.insertChild(self.NewFfs, Target_index)
-                    TargetParent.Child.remove(TargetParent.Child[-1])
-                    ModifyFfsType(self.NewFfs)
-                # Current Fv Free space is not enough for new Ffs, need to check parent Fv
+                if TargetFv.type == FV_TREE:
+                    self.Status = False
                 else:
-                    FreeSpaceNode = TargetParent.Child[-1]
-                    # If current Fv have free space, first check Current Fv then parent Fv
-                    if FreeSpaceNode.type == FFS_FREE_SPACE:
-                        Needed_Space -= TargetParent.Data.Free_Space
-                        New_Add_Len = BlockSize - Needed_Space%BlockSize
-                        if New_Add_Len % BlockSize:
-                            FreeSpaceNode.Data.Data = b'\xff' * New_Add_Len
-                            Needed_Space += New_Add_Len
-                        else:
-                            TargetParent.Child.remove(FreeSpaceNode)
-                        Target_index = TargetParent.Child.index(self.TargetFfs)
-                        TargetParent.Child.remove(self.TargetFfs)
-                        TargetParent.insertChild(self.NewFfs, Target_index)
-                        ModifyFfsType(self.NewFfs)
-                        TargetParent.Data.Data = b''
-                        for item in TargetParent.Child:
-                            if item.type == FFS_FREE_SPACE:
-                                TargetParent.Data.Data += item.Data.Data + item.Data.PadData
-                            else:
-                                TargetParent.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
-                        TargetParent.Data.Size += Needed_Space
-                        TargetParent.Data.Header.FvLength = TargetParent.Data.Size
-                        self.ModifyTest(TargetParent.Parent, Needed_Space)
-                    # If current Fv do not have free space, check parent free space
+                    New_Add_Len = BlockSize - Needed_Space%BlockSize
+                    ChildNum = len(TargetFv.Child)
+                    if New_Add_Len % BlockSize:
+                        TargetFv.Child[-1].Data.Data = b'\xff' * New_Add_Len
+                        Needed_Space += New_Add_Len
+                        TargetFv.insertChild(self.NewFfs, ChildNum-1)
                     else:
-                        New_Add_Len = BlockSize - Needed_Space%BlockSize
-                        if New_Add_Len < struct2stream(self.NewFfs.Data.Header):
-                            TargetParent.Child[-1].Data.PadData += b'\xff' * New_Add_Len
+                        TargetFv.Child.remove(self.TargetFfs)
+                        TargetFv.insertChild(self.NewFfs, -1)
+                    TargetFv.Data.Data = b''
+                    for item in TargetFv.Child:
+                        if item.type == FFS_FREE_SPACE:
+                            TargetFv.Data.Data += item.Data.Data + item.Data.PadData
                         else:
-                            if New_Add_Len % BlockSize:
-                                New_Free_Space = NODETREE(PADVECTOR)
-                                New_Free_Space.type = FFS_FREE_SPACE
-                                New_Free_Space.Data = FfsNode(New_Add_Len)
-                                New_Free_Space.Data.Data = b'\xff' * New_Add_Len
-                                Needed_Space += New_Add_Len
-                                TargetParent.insertChild(New_Free_Space, -1)
-                            else:
-                                TargetParent.Child.remove(FreeSpaceNode)
-                            Target_index = TargetParent.Child.index(self.TargetFfs)
-                            TargetParent.Child.remove(self.TargetFfs)
-                            TargetParent.insertChild(self.NewFfs, Target_index)
-                            ModifyFfsType(self.NewFfs)
-                            TargetParent.Data.Data = b''
-                            for item in TargetParent.Child:
-                                if item.type == FFS_FREE_SPACE:
-                                    TargetParent.Data.Data += item.Data.Data + item.Data.PadData
-                                else:
-                                    TargetParent.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
-                            TargetParent.Data.Size += Needed_Space
-                            TargetParent.Data.Header.FvLength = TargetParent.Data.Size
-                            self.ModifyTest(TargetParent.Parent, Needed_Space)
-            # self.NewFfs is smaller than origin ffs
-            elif len(self.NewFfs.Data.Data) <= len(self.TargetFfs.Data.Data):
-                offset_delta = len(self.TargetFfs.Data.Data) + len(self.TargetFfs.Data.PadData) - len(self.NewFfs.Data.Data) - len(self.NewFfs.Data.PadData)
-                NextFfs.Data.Data += b'\xff' * (offset_delta)
-                NextFfs.Data.HOffset -= offset_delta
-                NextFfs.Data.DOffset -= offset_delta
-                NextFfs.Data.Size += offset_delta
-                ChangeSize(NextFfs, -offset_delta)
-                Target_index = TargetParent.Child.index(self.TargetFfs)
-                TargetParent.Child.remove(self.TargetFfs)
-                TargetParent.insertChild(self.NewFfs, Target_index)
-                self.Status = True
-            # self.NewFfs + NewPadData == self.TargetFfs + OriPadData
-            elif len(self.TargetFfs.Data.Data) + len(self.TargetFfs.Data.PadData) >= len(self.NewFfs.Data.Data) >= len(self.TargetFfs.Data.Data):
-                Target_index = TargetParent.Child.index(self.TargetFfs)
-                TargetParent.Child.remove(self.TargetFfs)
-                TargetParent.insertChild(self.NewFfs, Target_index)
-                self.Status = True
-            # self.NewFfs larger than origin ffs but have enough space in Next FFS PAD.
-            else:
-                offset_delta = len(self.NewFfs.Data.Data) + len(self.NewFfs.Data.PadData) - len(self.TargetFfs.Data.Data) - len(self.TargetFfs.Data.PadData)
-                # Next FFS PAD Data space is enough for self.NewFfs
-                if (len(NextFfs.Data.Data) - offset_delta) >= 0:
-                    NextFfs.Data.Data = b'\xff' * (len(NextFfs.Data.Data) - offset_delta)
-                    NextFfs.Data.HOffset += offset_delta
-                    NextFfs.Data.DOffset += offset_delta
-                    NextFfs.Data.Size -= offset_delta
-                    ChangeSize(NextFfs, offset_delta)
-                    Target_index = TargetParent.Child.index(self.TargetFfs)
-                    TargetParent.Child.remove(self.TargetFfs)
-                    TargetParent.insertChild(self.NewFfs, Target_index)
-                    ModifyFfsType(self.NewFfs)
-                # The left free space is not enough for a new FFS PAD
-                else:
-                    self.NewFfs.Data.PadData += b'\xff' * (offset_delta - len(NextFfs.Data.Data))
-                    Target_index = TargetParent.Child.index(self.TargetFfs)
-                    TargetParent.Child.remove(self.TargetFfs)
-                    TargetParent.insertChild(self.NewFfs, Target_index)
-                    ModifyFfsType(self.NewFfs)
-                    TargetParent.Child.remove(NextFfs)
-                self.Status = True
+                            TargetFv.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
+                    TargetFv.Data.Size += Needed_Space
+                    TargetFv.Data.Header.FvLength = TargetFv.Data.Size
+                    self.ModifyTest(TargetFv.Parent, Needed_Space)
         else:
-            # Target Ffs space is not enough for new Ffs, need to check Fv freespace
-            if len(self.NewFfs.Data.Data) > len(self.TargetFfs.Data.Data) + len(self.TargetFfs.Data.PadData):
-                Needed_Space = len(self.NewFfs.Data.Data) - len(self.TargetFfs.Data.Data) - len(self.TargetFfs.Data.PadData)
-                if Needed_Space < TargetParent.Data.Free_Space:
-                    FreeSpaceNode = TargetParent.Child[-1]
-                    FreeSpaceNode.Data.Data = b'\xff' * (TargetParent.Data.Free_Space - Needed_Space)
-                    Target_index = TargetParent.Child.index(self.TargetFfs)
-                    TargetParent.Child.remove(self.TargetFfs)
-                    TargetParent.insertChild(self.NewFfs, Target_index)
-                    ModifyFfsType(self.NewFfs)
-                    self.Status = True
-                elif Needed_Space == TargetParent.Data.Free_Space:
-                    Target_index = TargetParent.Child.index(self.TargetFfs)
-                    TargetParent.Child.remove(self.TargetFfs)
-                    TargetParent.insertChild(self.NewFfs, Target_index)
-                    ModifyFfsType(self.NewFfs)
-                    TargetParent.Child.remove(TargetParent.Child[-1])
-                    self.Status = True
-                # Current Fv Free space is not enough for new Ffs, need to check parent Fv
-                else:
-                    FreeSpaceNode = TargetParent.Child[-1]
-                    if FreeSpaceNode.type == FFS_FREE_SPACE:
-                        Needed_Space -= TargetParent.Data.Free_Space
-                        New_Add_Len = BlockSize - Needed_Space%BlockSize
-                        if New_Add_Len % BlockSize:
-                            FreeSpaceNode.Data.Data = b'\xff' * New_Add_Len
-                            Needed_Space += New_Add_Len
-                        else:
-                            TargetParent.Child.remove(FreeSpaceNode)
-                        Target_index = TargetParent.Child.index(self.TargetFfs)
-                        TargetParent.Child.remove(self.TargetFfs)
-                        TargetParent.insertChild(self.NewFfs, Target_index)
-                        ModifyFfsType(self.NewFfs)
-                        TargetParent.Data.Data = b''
-                        for item in TargetParent.Child:
-                            if item.type == FFS_FREE_SPACE:
-                                TargetParent.Data.Data += item.Data.Data + item.Data.PadData
-                            else:
-                                TargetParent.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
-                        TargetParent.Data.Size += Needed_Space
-                        TargetParent.Data.Header.FvLength = TargetParent.Data.Size
-                        self.ModifyTest(TargetParent.Parent, Needed_Space)
-                    else:
-                        New_Add_Len = BlockSize - Needed_Space%BlockSize
-                        if New_Add_Len < struct2stream(self.NewFfs.Data.Header):
-                            TargetParent.Child[-1].Data.PadData += b'\xff' * New_Add_Len
-                        else:
-                            if New_Add_Len % BlockSize:
-                                New_Free_Space = NODETREE(PADVECTOR)
-                                New_Free_Space.type = FFS_FREE_SPACE
-                                New_Free_Space.Data = FfsNode(New_Add_Len)
-                                New_Free_Space.Data.Data = b'\xff' * New_Add_Len
-                                Needed_Space += New_Add_Len
-                                TargetParent.insertChild(New_Free_Space, -1)
-                            else:
-                                TargetParent.Child.remove(FreeSpaceNode)
-                            Target_index = TargetParent.Child.index(self.TargetFfs)
-                            TargetParent.Child.remove(self.TargetFfs)
-                            TargetParent.insertChild(self.NewFfs, Target_index)
-                            ModifyFfsType(self.NewFfs)
-                            TargetParent.Data.Data = b''
-                            for item in TargetParent.Child:
-                                if item.type == FFS_FREE_SPACE:
-                                    TargetParent.Data.Data += item.Data.Data + item.Data.PadData
-                                else:
-                                    TargetParent.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
-                            TargetParent.Data.Size += Needed_Space
-                            TargetParent.Data.Header.FvLength = TargetParent.Data.Size
-                            self.ModifyTest(TargetParent.Parent, Needed_Space)
-            elif len(self.NewFfs.Data.Data) > len(self.TargetFfs.Data.Data) + len(self.TargetFfs.Data.PadData) - self.TargetFfs.Data.Header.HeaderLength:
-                offset_delta = len(self.TargetFfs.Data.Data) + len(self.TargetFfs.Data.PadData) - len(self.NewFfs.Data.Data)
-                self.NewFfs.Data.Data += b'\xff' * (offset_delta)
-                self.NewFfs.Data.PadData = b''
-                self.NewFfs.Data.Size += offset_delta
-                ChangeSize(NextFfs, -offset_delta)
-                Target_index = TargetParent.Child.index(self.TargetFfs)
-                TargetParent.Child.remove(self.TargetFfs)
-                TargetParent.insertChild(self.NewFfs, Target_index)
+            New_Free_Space = self.TargetFfs.Data.Size - self.NewFfs.Data.Size
+            if TargetFv.Data.Free_Space:
+                TargetFv.Child[-1].Data.Data += b'\xff' * New_Free_Space
+                Target_index = TargetFv.Child.index(self.TargetFfs)
+                TargetFv.Child.remove(self.TargetFfs)
+                TargetFv.insertChild(self.NewFfs, Target_index)
                 self.Status = True
             else:
-                offset_delta = len(self.TargetFfs.Data.Data) + len(self.TargetFfs.Data.PadData) - len(self.NewFfs.Data.Data)
-                self.NewFfs_pad = NODETREE(PADVECTOR)
-                self.NewFfs_pad.type = FFS_PAD
-                self.NewFfs_pad.Data = FfsNode(b'\xff'* offset_delta)
-                self.NewFfs_pad.Data.Size = offset_delta
-                ChangeSize(NextFfs)
-                Target_index = TargetParent.Child.index(self.TargetFfs)
-                TargetParent.Child.remove(self.TargetFfs)
-                TargetParent.insertChild(self.NewFfs, Target_index)
-                TargetParent.insertChild(self.NewFfs_pad, Target_index+1)
+                New_Free_Space_Tree = NODETREE('FREE_SPACE')
+                New_Free_Space_Tree.type = FFS_FREE_SPACE
+                New_Free_Space_Tree.Data = FfsNode(b'\xff' * New_Free_Space)
+                TargetFv.insertChild(New_Free_Space, -1)
+                Target_index = TargetFv.Child.index(self.TargetFfs)
+                TargetFv.Child.remove(self.TargetFfs)
+                TargetFv.insertChild(self.NewFfs, Target_index)
                 self.Status = True
         return self.Status
 
@@ -436,20 +231,15 @@ class FfsMofify:
                 print('New_Add_Len', New_Add_Len)
                 print('Child Num', len(TargetFv.Child))
                 ChildNum = len(TargetFv.Child)
-                if New_Add_Len < struct2stream(self.NewFfs.Data.Header):
+                if New_Add_Len % BlockSize:
+                    New_Free_Space = NODETREE('FREE_SPACE')
+                    New_Free_Space.type = FFS_FREE_SPACE
+                    New_Free_Space.Data = FreeSpaceNode(b'\xff' * New_Add_Len)
+                    TargetLen += New_Add_Len
                     TargetFv.insertChild(self.NewFfs, -1)
-                    TargetFv.Child[-1].Data.PadData += b'\xff' * New_Add_Len
+                    TargetFv.insertChild(New_Free_Space, -1)
                 else:
-                    if New_Add_Len % BlockSize:
-                        New_Free_Space = NODETREE(PADVECTOR)
-                        New_Free_Space.type = FFS_FREE_SPACE
-                        New_Free_Space.Data = FfsNode(New_Add_Len)
-                        New_Free_Space.Data.Data = b'\xff' * New_Add_Len
-                        TargetLen += New_Add_Len
-                        TargetFv.insertChild(self.NewFfs, -1)
-                        TargetFv.insertChild(New_Free_Space, -1)
-                    else:
-                        TargetFv.insertChild(self.NewFfs, -1)
+                    TargetFv.insertChild(self.NewFfs, -1)
                 ModifyFfsType(self.NewFfs)
                 TargetFv.Data.Data = b''
                 for item in TargetFv.Child:

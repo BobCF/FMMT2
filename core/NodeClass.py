@@ -132,3 +132,14 @@ class SectionNode:
             return Get_USER_INTERFACE_Header(nums//2).from_buffer_copy(buffer)
         elif Type == 0x18:
             return EFI_FREEFORM_SUBTYPE_GUID_SECTION.from_buffer_copy(buffer)
+
+
+class FreeSpaceNode:
+    def __init__(self, buffer: bytes):
+        self.Name = 'Free_Space'
+        self.Data = buffer
+        self.Size = len(buffer)
+        self.HOffset = 0
+        self.DOffset = 0
+        self.ROffset = 0
+        self.PadData = b''

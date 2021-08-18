@@ -209,7 +209,13 @@ class FvProduct(BinaryProduct):
         while Rel_Offset < Data_Size:
             # Create a FfsNode and set it as the FFsTree's Data
             if Data_Size - Rel_Offset < 24:
-                ParTree.Child[-1].Data.PadData += Whole_Data[Rel_Offset:]
+                Ffs_Tree = NODETREE('Free_Space')
+                Ffs_Tree.type = FFS_FREE_SPACE
+                Ffs_Tree.Data = FreeSpaceNode(Whole_Data[Rel_Offset:])
+                Ffs_Tree.Data.HOffset = Ffs_Offset + Rel_Whole_Offset
+                Ffs_Tree.Data.DOffset = Ffs_Tree.Data.HOffset
+                ParTree.Data.Free_Space = Data_Size - Rel_Offset
+                ParTree.insertChild(Ffs_Tree)
                 Rel_Offset = Data_Size
             else:
                 Ffs_Info = FfsNode(Whole_Data[Rel_Offset:])
@@ -243,13 +249,14 @@ class FvProduct(BinaryProduct):
                 Rel_Offset += Ffs_Info.Size + Pad_Size
                 Ffs_Tree.Data = Ffs_Info
                 # if Ffs_Tree.Data.Header.HeaderLength + len(Ffs_Tree.Data.Data) != Data_Size:
+                print('   Ffs Header Type: ',Ffs_Tree.Data.Header.Type)
                 ParTree.insertChild(Ffs_Tree)
             print('  GetFfs: ', Ffs_Info.Name)
             print('   GetFfsSize: ', Ffs_Tree.Data.Size)
             print('   GetFfsHOffset: ', Ffs_Tree.Data.HOffset)
             print('   GetFfsDOffset: ', Ffs_Tree.Data.DOffset)
-            print('   RelOffset', Rel_Offset)
-            print('   Data_Size', Data_Size)
+            print('   RelOffset: ', Rel_Offset)
+            print('   Data_Size: ', Data_Size)
 
 class FdProduct(BinaryProduct):
     type = [ROOT_FV_TREE, ROOT_TREE]
