@@ -5,20 +5,26 @@ from core.NodeClass import *
 from PI.Common import *
 from PI.ExtendCType import *
 
-BlockSize = 1000
+BlockSize = 0x1000
 
-class FfsMofify:
+class FfsModify:
     def __init__(self, NewFfs, TargetFfs):
         self.NewFfs = NewFfs
         self.TargetFfs = TargetFfs
         self.Status = False
 
-    def ModifyOffset(self, target, Delta_Offset, StopFfsName):
-        if target.Data.Name != StopFfsName:
-            target.Data.DOffset += Delta_Offset
-            target.Data.HOffset += Delta_Offset
-            for item in target.Child:
-                self.ModifyOffset(item, Delta_Offset, StopFfsName)
+    def ModifyFvExtData(self, TreeNode):
+        FvExtData = b''
+        if TreeNode.Data.Header.ExtHeaderOffset:
+            FvExtHeader = struct2stream(TreeNode.Data.ExtHeader)
+            FvExtData += FvExtHeader
+        if TreeNode.Data.ExtEntryExist:
+            FvExtEntry = struct2stream(TreeNode.Data.ExtEntry)
+            FvExtData += FvExtEntry
+        if FvExtData:
+            InfoNode = TreeNode.Child[0]
+            InfoNode.Data.Data = FvExtData + InfoNode.Data.Data[TreeNode.Data.ExtHeader.ExtHeaderSize:]
+            InfoNode.Data.ModCheckSum()
 
     def ModifyTest(self, ParTree, Needed_Space):
         print('ParTree.type', ParTree.type)
@@ -31,6 +37,7 @@ class FfsMofify:
                 Needed_Space = Needed_Space - ParTree.Data.Free_Space
                 if Needed_Space < 0:
                     ParTree.Child[-1].Data.Data = b'\xff' * (-Needed_Space)
+                    ParTree.Data.Free_Space = (-Needed_Space)
                     self.Status = True
                 else:
                     if ParTree.type == FV_TREE:
@@ -39,9 +46,11 @@ class FfsMofify:
                         New_Add_Len = BlockSize - Needed_Space%BlockSize
                         if New_Add_Len % BlockSize:
                             ParTree.Child[-1].Data.Data = b'\xff' * New_Add_Len
+                            ParTree.Data.Free_Space = New_Add_Len
                             Needed_Space += New_Add_Len
                         else:
                             ParTree.Child.remove(ParTree.Child[-1])
+                            ParTree.Data.Free_Space = 0
                         ParTree.Data.Size += Needed_Space
                         ParTree.Data.Header.Fvlength = ParTree.Data.Size
                 for item in ParTree.Child:
@@ -49,6 +58,11 @@ class FfsMofify:
                         ParTree.Data.Data += item.Data.Data + item.Data.PadData
                     else:
                         ParTree.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
+                print('Collection')
+                ParTree.Data.ModFvExt()
+                ParTree.Data.ModFvSize()
+                ParTree.Data.ModExtHeaderData()
+                self.ModifyFvExtData(ParTree)
             elif ParTree.type == FFS_TREE:
                 ParTree.Data.Data = b''
                 print('Test')
@@ -121,23 +135,29 @@ class FfsMofify:
             Needed_Space = self.NewFfs.Data.Size - self.TargetFfs.Data.Size
             if TargetFv.Data.Free_Space >= Needed_Space:
                 TargetFv.Child[-1].Data.Data = b'\xff' * (TargetFv.Data.Free_Space - Needed_Space)
+                TargetFv.Data.Free_Space -= Needed_Space
                 Target_index = TargetFv.Child.index(self.TargetFfs)
                 TargetFv.Child.remove(self.TargetFfs)
                 TargetFv.insertChild(self.NewFfs, Target_index)
+                TargetFv.Data.ModFvExt()
+                TargetFv.Data.ModFvSize()
+                TargetFv.Data.ModExtHeaderData()
+                self.ModifyFvExtData(TargetFv)
                 self.Status = True
             else:
                 if TargetFv.type == FV_TREE:
                     self.Status = False
                 else:
                     New_Add_Len = BlockSize - Needed_Space%BlockSize
-                    ChildNum = len(TargetFv.Child)
                     if New_Add_Len % BlockSize:
                         TargetFv.Child[-1].Data.Data = b'\xff' * New_Add_Len
+                        TargetFv.Data.Free_Space = New_Add_Len
                         Needed_Space += New_Add_Len
-                        TargetFv.insertChild(self.NewFfs, ChildNum-1)
+                        TargetFv.insertChild(self.NewFfs, -1)
                     else:
                         TargetFv.Child.remove(self.TargetFfs)
-                        TargetFv.insertChild(self.NewFfs, -1)
+                        TargetFv.Data.Free_Space = 0
+                        TargetFv.insertChild(self.NewFfs)
                     TargetFv.Data.Data = b''
                     for item in TargetFv.Child:
                         if item.type == FFS_FREE_SPACE:
@@ -146,11 +166,16 @@ class FfsMofify:
                             TargetFv.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
                     TargetFv.Data.Size += Needed_Space
                     TargetFv.Data.Header.FvLength = TargetFv.Data.Size
+                    TargetFv.Data.ModFvExt()
+                    TargetFv.Data.ModFvSize()
+                    TargetFv.Data.ModExtHeaderData()
+                    self.ModifyFvExtData(TargetFv)
                     self.ModifyTest(TargetFv.Parent, Needed_Space)
         else:
             New_Free_Space = self.TargetFfs.Data.Size - self.NewFfs.Data.Size
             if TargetFv.Data.Free_Space:
                 TargetFv.Child[-1].Data.Data += b'\xff' * New_Free_Space
+                TargetFv.Data.Free_Space += New_Free_Space
                 Target_index = TargetFv.Child.index(self.TargetFfs)
                 TargetFv.Child.remove(self.TargetFfs)
                 TargetFv.insertChild(self.NewFfs, Target_index)
@@ -159,11 +184,16 @@ class FfsMofify:
                 New_Free_Space_Tree = NODETREE('FREE_SPACE')
                 New_Free_Space_Tree.type = FFS_FREE_SPACE
                 New_Free_Space_Tree.Data = FfsNode(b'\xff' * New_Free_Space)
-                TargetFv.insertChild(New_Free_Space, -1)
+                TargetFv.Data.Free_Space = New_Free_Space
+                TargetFv.insertChild(New_Free_Space)
                 Target_index = TargetFv.Child.index(self.TargetFfs)
                 TargetFv.Child.remove(self.TargetFfs)
                 TargetFv.insertChild(self.NewFfs, Target_index)
                 self.Status = True
+            TargetFv.Data.ModFvExt()
+            TargetFv.Data.ModFvSize()
+            TargetFv.Data.ModExtHeaderData()
+            self.ModifyFvExtData(TargetFv)
         return self.Status
 
     def AddFfs(self):
@@ -181,12 +211,16 @@ class FfsMofify:
             if TargetLen < 0:
                 self.Status = True
                 self.TargetFfs.Data.Data = b'\xff' * (-TargetLen)
-                TargetFv.insertChild(self.NewFfs, -2)
+                TargetFv.Data.Free_Space = (-TargetLen)
+                TargetFv.Data.ModFvExt()
+                TargetFv.Data.ModExtHeaderData()
+                self.ModifyFvExtData(TargetFv)
+                TargetFv.insertChild(self.NewFfs, -1)
                 ModifyFfsType(self.NewFfs)
             elif TargetLen == 0:
                 self.Status = True
                 TargetFv.Child.remove(self.TargetFfs)
-                TargetFv.insertChild(self.NewFfs, -1)
+                TargetFv.insertChild(self.NewFfs)
                 ModifyFfsType(self.NewFfs)
             else:
                 if TargetFv.type == FV_TREE:
@@ -197,14 +231,16 @@ class FfsMofify:
                     print('New_Add_Len', New_Add_Len)
                     print('Child Num', len(TargetFv.Child))
                     print('TargetFv child', TargetFv.Child[-2], TargetFv.Child[-1])
-                    ChildNum = len(TargetFv.Child)
                     if New_Add_Len % BlockSize:
                         self.TargetFfs.Data.Data = b'\xff' * New_Add_Len
+                        self.TargetFfs.Data.Size = New_Add_Len
                         TargetLen += New_Add_Len
-                        TargetFv.insertChild(self.NewFfs, ChildNum-1)
+                        TargetFv.insertChild(self.NewFfs, -1)
+                        TargetFv.Data.Free_Space = New_Add_Len
                     else:
                         TargetFv.Child.remove(self.TargetFfs)
-                        TargetFv.insertChild(self.NewFfs, -1)
+                        TargetFv.insertChild(self.NewFfs)
+                        TargetFv.Data.Free_Space = 0
                     ModifyFfsType(self.NewFfs)
                     print('Child Num', len(TargetFv.Child))
                     print('TargetFv Child', TargetFv.Child[-3], TargetFv.Child[-2], TargetFv.Child[-1])
@@ -217,6 +253,10 @@ class FfsMofify:
                             TargetFv.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
                     TargetFv.Data.Size += TargetLen
                     TargetFv.Data.Header.FvLength = TargetFv.Data.Size
+                    TargetFv.Data.ModFvExt()
+                    TargetFv.Data.ModFvSize()
+                    TargetFv.Data.ModExtHeaderData()
+                    self.ModifyFvExtData(TargetFv)
                     self.ModifyTest(TargetFv.Parent, TargetLen)
         else:
             TargetLen = self.NewFfs.Data.Size
@@ -236,10 +276,11 @@ class FfsMofify:
                     New_Free_Space.type = FFS_FREE_SPACE
                     New_Free_Space.Data = FreeSpaceNode(b'\xff' * New_Add_Len)
                     TargetLen += New_Add_Len
-                    TargetFv.insertChild(self.NewFfs, -1)
-                    TargetFv.insertChild(New_Free_Space, -1)
+                    TargetFv.Data.Free_Space = New_Add_Len
+                    TargetFv.insertChild(self.NewFfs)
+                    TargetFv.insertChild(New_Free_Space)
                 else:
-                    TargetFv.insertChild(self.NewFfs, -1)
+                    TargetFv.insertChild(self.NewFfs)
                 ModifyFfsType(self.NewFfs)
                 TargetFv.Data.Data = b''
                 for item in TargetFv.Child:
@@ -249,5 +290,9 @@ class FfsMofify:
                         TargetFv.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
                 TargetFv.Data.Size += TargetLen
                 TargetFv.Data.Header.FvLength = TargetFv.Data.Size
+                TargetFv.Data.ModFvExt()
+                TargetFv.Data.ModFvSize()
+                TargetFv.Data.ModExtHeaderData()
+                self.ModifyFvExtData(TargetFv)
                 self.ModifyTest(TargetFv.Parent, TargetLen)
         return self.Status

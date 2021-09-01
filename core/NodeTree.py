@@ -39,21 +39,21 @@ class NODETREE:
         return False
 
     # FvTree.insertChild()
-    def insertChild(self, newNode, pos=-1):
+    def insertChild(self, newNode, pos=None):
         if len(self.Child) == 0:
             self.Child.append(newNode)
         else:
-            if pos == -1:
-                LastTree = self.Child[pos]
+            if not pos:
+                LastTree = self.Child[-1]
                 self.Child.append(newNode)
                 LastTree.NextRel = newNode
                 newNode.LastRel = LastTree
             else:
-                self.Child.insert(pos, newNode)
                 newNode.NextRel = self.Child[pos-1].NextRel
-                newNode.LastRel = self.Child[pos+1].LastRel
+                newNode.LastRel = self.Child[pos].LastRel
                 self.Child[pos-1].NextRel = newNode
-                self.Child[pos+1].LastRel = newNode
+                self.Child[pos].LastRel = newNode
+                self.Child.insert(pos, newNode)
         newNode.Parent = self
 
     # lastNode.insertRel(newNode)
@@ -110,8 +110,8 @@ class NODETREE:
             print("{}Name:{}  UiName:{}  Version:{}  Type:{}  Size:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.Data.UiName, self.Data.Version, self.type, hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
             TreeInfo.append("{}Name:{}  UiName:{}  Version:{}  Type:{}  Size:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.Data.UiName, self.Data.Version, self.type, hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
         elif self.type == SECTION_TREE and self.Data.Type == 0x02:
-            print("{}Name:{}  Type:{}  Size:{}  DecompressedSize:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.type, hex(len(self.Data.OriData)), hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
-            TreeInfo.append("{}Name:{}  Type:{}  Size:{}  DecompressedSize:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.type, hex(len(self.Data.OriData)), hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
+            print("{}Name:{}  Type:{}  Size:{}  DecompressedSize:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.type, hex(len(self.Data.OriData)+self.Data.HeaderLength), hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
+            TreeInfo.append("{}Name:{}  Type:{}  Size:{}  DecompressedSize:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.type, hex(len(self.Data.OriData)+self.Data.HeaderLength), hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
         elif self is not None:
             print("{}Name:{}  Type:{}  Size:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.type, hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
             TreeInfo.append("{}Name:{}  Type:{}  Size:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.type, hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))

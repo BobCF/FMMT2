@@ -85,7 +85,7 @@ def AddNewFfs(inputfile, Fv_name, newffsfile, outputfile):
     with open(newffsfile, "rb") as f:
         new_ffs_data = f.read()
     NewFmmtParser = FMMTParser(newffsfile, ROOT_FFS_TREE)
-    # FindSpace = False
+    Status = False
     # 3. Data Modify
     for TargetFv in FmmtParser.WholeFvTree.Findlist:
         TargetFfsPad = TargetFv.Child[-1]
@@ -95,7 +95,7 @@ def AddNewFfs(inputfile, Fv_name, newffsfile, outputfile):
             NewFmmtParser.ParserFromRoot(NewFmmtParser.WholeFvTree, new_ffs_data, TargetFfsPad.Data.HOffset+TargetFfsPad.Data.Size)
         print('NewFmmtParser.WholeFvTree.Child', NewFmmtParser.WholeFvTree.Child[0].Data.Name)
         print('TargetFfsPad', TargetFfsPad.Data.Name)
-        FfsMod = FfsMofify(NewFmmtParser.WholeFvTree.Child[0], TargetFfsPad)
+        FfsMod = FfsModify(NewFmmtParser.WholeFvTree.Child[0], TargetFfsPad)
         Status = FfsMod.AddFfs()
         print('Status', Status)
     # 4. Data Encapsultion
@@ -115,6 +115,7 @@ def ReplaceFfs(inputfile, Ffs_name, newffsfile, outputfile, Fv_name=None):
         new_ffs_data = f.read()
     newFmmtParser = FMMTParser(newffsfile, FV_TREE)
     newFmmtParser.ParserFromRoot(newFmmtParser.WholeFvTree, new_ffs_data)
+    Status = False
     # 3. Data Modify
     new_ffs = newFmmtParser.WholeFvTree.Child[0]
     new_ffs.Data.PadData = GetPadSize(new_ffs.Data.Size, 8) * b'\xff'
@@ -125,7 +126,7 @@ def ReplaceFfs(inputfile, Ffs_name, newffsfile, outputfile, Fv_name=None):
                 FmmtParser.WholeFvTree.Findlist.remove(item)
     if FmmtParser.WholeFvTree.Findlist != []:
         for TargetFfs in FmmtParser.WholeFvTree.Findlist:
-            FfsMod = FfsMofify(newFmmtParser.WholeFvTree.Child[0], TargetFfs)
+            FfsMod = FfsModify(newFmmtParser.WholeFvTree.Child[0], TargetFfs)
             Status = FfsMod.ReplaceFfs()
             print('Status', Status)
     # 4. Data Encapsultion

@@ -39,6 +39,23 @@ class FvNode:
         if self.Header.ExtHeaderOffset:
             self.ExtHeader = EFI_FIRMWARE_VOLUME_EXT_HEADER.from_buffer_copy(buffer[self.Header.ExtHeaderOffset:])
             self.Name =  uuid.UUID(bytes_le=struct2stream(self.ExtHeader.FvName))
+            self.ExtEntryOffset = self.Header.ExtHeaderOffset + 20
+            if self.ExtHeader.ExtHeaderSize != 20:
+                self.ExtEntryExist = 1
+                self.ExtEntry = EFI_FIRMWARE_VOLUME_EXT_ENTRY.from_buffer_copy(buffer[self.ExtEntryOffset:])
+                self.ExtTypeExist = 1
+                if self.ExtEntry.ExtEntryType == 0x01:
+                    nums = (self.ExtEntry.ExtEntrySize - 8) // 16
+                    self.ExtEntry = Refine_FV_EXT_ENTRY_OEM_TYPE_Header(nums).from_buffer_copy(buffer[self.ExtEntryOffset:])
+                elif self.ExtEntry.ExtEntryType == 0x02:
+                    nums = self.ExtEntry.ExtEntrySize - 20
+                    self.ExtEntry = Refine_FV_EXT_ENTRY_GUID_TYPE_Header(nums).from_buffer_copy(buffer[self.ExtEntryOffset:])
+                elif self.ExtEntry.ExtEntryType == 0x03:
+                    self.ExtEntry = EFI_FIRMWARE_VOLUME_EXT_ENTRY_USED_SIZE_TYPE.from_buffer_copy(buffer[self.ExtEntryOffset:])
+                else:
+                    self.ExtTypeExist = 0
+            else:
+                self.ExtEntryExist = 0
         self.Size = self.Header.FvLength
         self.HeaderLength = self.Header.HeaderLength
         self.HOffset = 0
@@ -55,6 +72,34 @@ class FvNode:
 
     def ModCheckSum(self):
         pass
+
+    def ModFvExt(self):
+        # Modify ExtHeader
+        if self.Header.ExtHeaderOffset and self.ExtEntryExist and self.ExtTypeExist and self.ExtEntry.Hdr.ExtEntryType == 0x03:
+            print('Modify Fv ExtHeader!')
+            self.ExtEntry.UsedSize = self.Header.FvLength - self.Free_Space
+
+# Delta_Size = NewSize - OriSize
+    def ModFvSize(self):
+        # if Delta_Size:
+        #     # Modify FvLength
+        #     self.Header.FvLength += Delta_Size
+        # Modify BlockMap
+        BlockMapNum = len(self.Header.BlockMap)
+        for i in range(BlockMapNum):
+            if self.Header.BlockMap[i].Length:
+                self.Header.BlockMap[i].NumBlocks = self.Header.FvLength // self.Header.BlockMap[i].Length
+
+    def ModExtHeaderData(self):
+        # pass
+        if self.Header.ExtHeaderOffset:
+            ExtHeaderData = struct2stream(self.ExtHeader)
+            ExtHeaderDataOffset = self.Header.ExtHeaderOffset - self.HeaderLength
+            self.Data = self.Data[:ExtHeaderDataOffset] + ExtHeaderData + self.Data[ExtHeaderDataOffset+20:]
+        if self.ExtEntryExist:
+            ExtHeaderEntryData = struct2stream(self.ExtEntry)
+            ExtHeaderEntryDataOffset = self.Header.ExtHeaderOffset + 20 - self.HeaderLength
+            self.Data = self.Data[:ExtHeaderEntryDataOffset] + ExtHeaderEntryData + self.Data[ExtHeaderEntryDataOffset+len(ExtHeaderEntryData):]
 
 class FfsNode:
     def __init__(self, buffer: bytes):
@@ -79,7 +124,7 @@ class FfsNode:
         HeaderData = struct2stream(self.Header)
         HeaderSum = 0
         DataSum = 0
-        if self.Header.Attributes != '0x00':
+        if self.Header.Attributes != 0:
             for item in self.Data:
                 DataSum += item
             if hex(DataSum + self.Header.IntegrityCheck.Checksum.File)[-2:] != '00':
