@@ -131,6 +131,7 @@ class FfsModify:
 
     def ReplaceFfs(self):
         TargetFv = self.TargetFfs.Parent
+        self.NewFfs.Data.PadData = b'\xff' * GetPadSize(self.NewFfs.Data.Size, 8)
         if self.NewFfs.Data.Size > self.TargetFfs.Data.Size:
             Needed_Space = self.NewFfs.Data.Size - self.TargetFfs.Data.Size
             if TargetFv.Data.Free_Space >= Needed_Space:
@@ -198,8 +199,9 @@ class FfsModify:
 
     def AddFfs(self):
         print('self.TargetFfs.type', self.TargetFfs.type)
-        if self.TargetFfs.type == FFS_FREE_SPACE:   
-            TargetLen = self.NewFfs.Data.Size - self.TargetFfs.Data.Size
+        self.NewFfs.Data.PadData = b'\xff' * GetPadSize(self.NewFfs.Data.Size, 8)
+        if self.TargetFfs.type == FFS_FREE_SPACE:
+            TargetLen = self.NewFfs.Data.Size + len(self.NewFfs.Data.PadData) - self.TargetFfs.Data.Size - len(self.TargetFfs.Data.PadData)
             print('self.NewFfs.Data.Size', self.NewFfs.Data.Size)
             print('self.TargetFfs.Data.Size', self.TargetFfs.Data.Size)
             print(TargetLen)
@@ -259,7 +261,7 @@ class FfsModify:
                     self.ModifyFvExtData(TargetFv)
                     self.ModifyTest(TargetFv.Parent, TargetLen)
         else:
-            TargetLen = self.NewFfs.Data.Size
+            TargetLen = self.NewFfs.Data.Size + len(self.NewFfs.Data.PadData)
             TargetFv = self.TargetFfs.Parent
             print('TargetFv', TargetFv.type)
             print('TargetFv Name', TargetFv.Data.Name)

@@ -87,22 +87,25 @@ def AddNewFfs(inputfile, Fv_name, newffsfile, outputfile):
     NewFmmtParser = FMMTParser(newffsfile, ROOT_FFS_TREE)
     Status = False
     # 3. Data Modify
-    for TargetFv in FmmtParser.WholeFvTree.Findlist:
-        TargetFfsPad = TargetFv.Child[-1]
-        if TargetFfsPad.type == FFS_FREE_SPACE:
-            NewFmmtParser.ParserFromRoot(NewFmmtParser.WholeFvTree, new_ffs_data, TargetFfsPad.Data.HOffset)
-        else:
-            NewFmmtParser.ParserFromRoot(NewFmmtParser.WholeFvTree, new_ffs_data, TargetFfsPad.Data.HOffset+TargetFfsPad.Data.Size)
-        print('NewFmmtParser.WholeFvTree.Child', NewFmmtParser.WholeFvTree.Child[0].Data.Name)
-        print('TargetFfsPad', TargetFfsPad.Data.Name)
-        FfsMod = FfsModify(NewFmmtParser.WholeFvTree.Child[0], TargetFfsPad)
-        Status = FfsMod.AddFfs()
-        print('Status', Status)
-    # 4. Data Encapsultion
-    if Status:
-        FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)
-        with open(outputfile, "wb") as f:
-            f.write(FmmtParser.FinalData)
+    if FmmtParser.WholeFvTree.Findlist:
+        for TargetFv in FmmtParser.WholeFvTree.Findlist:
+            TargetFfsPad = TargetFv.Child[-1]
+            if TargetFfsPad.type == FFS_FREE_SPACE:
+                NewFmmtParser.ParserFromRoot(NewFmmtParser.WholeFvTree, new_ffs_data, TargetFfsPad.Data.HOffset)
+            else:
+                NewFmmtParser.ParserFromRoot(NewFmmtParser.WholeFvTree, new_ffs_data, TargetFfsPad.Data.HOffset+TargetFfsPad.Data.Size)
+            print('NewFmmtParser.WholeFvTree.Child', NewFmmtParser.WholeFvTree.Child[0].Data.Name)
+            print('TargetFfsPad', TargetFfsPad.Data.Name)
+            FfsMod = FfsModify(NewFmmtParser.WholeFvTree.Child[0], TargetFfsPad)
+            Status = FfsMod.AddFfs()
+            print('Status', Status)
+        # 4. Data Encapsultion
+        if Status:
+            FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)
+            with open(outputfile, "wb") as f:
+                f.write(FmmtParser.FinalData)
+    else:
+        print('Target Fv not found!!!')
 
 def ReplaceFfs(inputfile, Ffs_name, newffsfile, outputfile, Fv_name=None):
     # 1. Data Prepare

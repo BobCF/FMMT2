@@ -123,20 +123,13 @@ class FfsNode:
     def ModCheckSum(self):
         HeaderData = struct2stream(self.Header)
         HeaderSum = 0
-        DataSum = 0
-        if self.Header.Attributes != 0:
-            for item in self.Data:
-                DataSum += item
-            if hex(DataSum + self.Header.IntegrityCheck.Checksum.File)[-2:] != '00':
-                self.Header.IntegrityCheck.Checksum.File == 0x100 - int(hex(DataSum)[-2:], 16)
-        else:
-            self.Header.IntegrityCheck.Checksum.File =='0xAA'
         for item in HeaderData:
             HeaderSum += item
         HeaderSum -= self.Header.State
         HeaderSum -= self.Header.IntegrityCheck.Checksum.File
-        if hex(HeaderSum)[-2:] != '00':
-            self.Header.IntegrityCheck.Checksum.Header == 0x100 - int(hex(HeaderSum)[-2:], 16)
+        if HeaderSum & 0x11:
+            Header = self.Header.IntegrityCheck.Checksum.Header + 0x100 - int(hex(HeaderSum)[-2:], 16)
+            self.Header.IntegrityCheck.Checksum.Header = int(hex(Header)[-2:], 16)
 
 class SectionNode:
     def __init__(self, buffer: bytes):
