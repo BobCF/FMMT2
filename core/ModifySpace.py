@@ -6,6 +6,7 @@ from PI.Common import *
 from PI.ExtendCType import *
 
 BlockSize = 0x1000
+EFI_FVB2_ERASE_POLARITY = 0x00000800
 
 class FfsModify:
     def __init__(self, NewFfs, TargetFfs):
@@ -110,10 +111,13 @@ class FfsModify:
                     ParTree.Data.Header.Size[0] = New_Size % (16**2)
                     ParTree.Data.Header.Size[1] = New_Size % (16**4) //(16**2)
                     ParTree.Data.Header.Size[2] = New_Size // (16**4)
-                    New_Pad_Size = GetPadSize(New_Size, 4) 
-                    Delta_Pad_Size = New_Pad_Size - len(ParTree.Data.PadData)
-                    ParTree.Data.PadData = b'\x00' * New_Pad_Size
-                    Needed_Space += Delta_Pad_Size
+                    if ParTree.NextRel:
+                        New_Pad_Size = GetPadSize(New_Size, 4)
+                        Delta_Pad_Size = New_Pad_Size - len(ParTree.Data.PadData)
+                        ParTree.Data.PadData = b'\x00' * New_Pad_Size
+                        Needed_Space += Delta_Pad_Size
+                    else:
+                        ParTree.Data.PadData = b''
                 elif Needed_Space:
                     print('Not Guid')
                     ChangeSize(ParTree, -Needed_Space)
@@ -131,6 +135,9 @@ class FfsModify:
 
     def ReplaceFfs(self):
         TargetFv = self.TargetFfs.Parent
+        if TargetFv.Data.Header.Attributes & EFI_FVB2_ERASE_POLARITY:
+                self.NewFfs.Data.Header.State = c_uint8(
+                    ~self.NewFfs.Data.Header.State)
         self.NewFfs.Data.PadData = b'\xff' * GetPadSize(self.NewFfs.Data.Size, 8)
         if self.NewFfs.Data.Size > self.TargetFfs.Data.Size:
             Needed_Space = self.NewFfs.Data.Size - self.TargetFfs.Data.Size
@@ -210,6 +217,9 @@ class FfsModify:
             print('TargetFfs', self.TargetFfs.Data.Name)
             print('TargetFv', TargetFv.type)
             print('TargetFv Name', TargetFv.Data.Name)
+            if TargetFv.Data.Header.Attributes & EFI_FVB2_ERASE_POLARITY:
+                self.NewFfs.Data.Header.State = c_uint8(
+                    ~self.NewFfs.Data.Header.State)
             if TargetLen < 0:
                 self.Status = True
                 self.TargetFfs.Data.Data = b'\xff' * (-TargetLen)
@@ -265,6 +275,9 @@ class FfsModify:
             TargetFv = self.TargetFfs.Parent
             print('TargetFv', TargetFv.type)
             print('TargetFv Name', TargetFv.Data.Name)
+            if TargetFv.Data.Header.Attributes & EFI_FVB2_ERASE_POLARITY:
+                self.NewFfs.Data.Header.State = c_uint8(
+                    ~self.NewFfs.Data.Header.State)
             if TargetFv.type == FV_TREE:
                 self.Status = False
             elif TargetFv.type == SEC_FV_TREE:
