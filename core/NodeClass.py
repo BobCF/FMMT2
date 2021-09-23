@@ -69,9 +69,16 @@ class FvNode:
             assert False
         self.PadData = b''
         self.Free_Space = 0
+        self.ModCheckSum()
 
     def ModCheckSum(self):
-        pass
+        Header = struct2stream(self.Header)[::-1]
+        Size = self.HeaderLength // 2
+        Sum = 0
+        for i in range(Size):
+            Sum += int(Header[i*2: i*2 + 2].hex(), 16)
+        if Sum & 0x1111:
+            self.Header.Checksum = int(hex(0x10000 - int(hex(Sum - self.Header.Checksum)[-4:], 16)), 16)
 
     def ModFvExt(self):
         # Modify ExtHeader

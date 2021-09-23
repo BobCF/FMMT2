@@ -64,6 +64,7 @@ class FfsModify:
                 ParTree.Data.ModFvSize()
                 ParTree.Data.ModExtHeaderData()
                 self.ModifyFvExtData(ParTree)
+                ParTree.Data.ModCheckSum()
             elif ParTree.type == FFS_TREE:
                 ParTree.Data.Data = b''
                 print('Test')
@@ -151,6 +152,7 @@ class FfsModify:
                 TargetFv.Data.ModFvSize()
                 TargetFv.Data.ModExtHeaderData()
                 self.ModifyFvExtData(TargetFv)
+                TargetFv.Data.ModCheckSum()
                 self.Status = True
             else:
                 if TargetFv.type == FV_TREE:
@@ -178,6 +180,7 @@ class FfsModify:
                     TargetFv.Data.ModFvSize()
                     TargetFv.Data.ModExtHeaderData()
                     self.ModifyFvExtData(TargetFv)
+                    TargetFv.Data.ModCheckSum()
                     self.ModifyTest(TargetFv.Parent, Needed_Space)
         else:
             New_Free_Space = self.TargetFfs.Data.Size - self.NewFfs.Data.Size
@@ -202,6 +205,7 @@ class FfsModify:
             TargetFv.Data.ModFvSize()
             TargetFv.Data.ModExtHeaderData()
             self.ModifyFvExtData(TargetFv)
+            TargetFv.Data.ModCheckSum()
         return self.Status
 
     def AddFfs(self):
@@ -227,6 +231,7 @@ class FfsModify:
                 TargetFv.Data.ModFvExt()
                 TargetFv.Data.ModExtHeaderData()
                 self.ModifyFvExtData(TargetFv)
+                TargetFv.Data.ModCheckSum()
                 TargetFv.insertChild(self.NewFfs, -1)
                 ModifyFfsType(self.NewFfs)
             elif TargetLen == 0:
@@ -269,6 +274,7 @@ class FfsModify:
                     TargetFv.Data.ModFvSize()
                     TargetFv.Data.ModExtHeaderData()
                     self.ModifyFvExtData(TargetFv)
+                    TargetFv.Data.ModCheckSum()
                     self.ModifyTest(TargetFv.Parent, TargetLen)
         else:
             TargetLen = self.NewFfs.Data.Size + len(self.NewFfs.Data.PadData)
@@ -309,5 +315,6 @@ class FfsModify:
                 TargetFv.Data.ModFvSize()
                 TargetFv.Data.ModExtHeaderData()
                 self.ModifyFvExtData(TargetFv)
+                TargetFv.Data.ModCheckSum()
                 self.ModifyTest(TargetFv.Parent, TargetLen)
         return self.Status
