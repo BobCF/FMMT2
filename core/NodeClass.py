@@ -77,7 +77,7 @@ class FvNode:
         Sum = 0
         for i in range(Size):
             Sum += int(Header[i*2: i*2 + 2].hex(), 16)
-        if Sum & 0x1111:
+        if Sum & 0xffff:
             self.Header.Checksum = int(hex(0x10000 - int(hex(Sum - self.Header.Checksum)[-4:], 16)), 16)
 
     def ModFvExt(self):
@@ -134,7 +134,7 @@ class FfsNode:
             HeaderSum += item
         HeaderSum -= self.Header.State
         HeaderSum -= self.Header.IntegrityCheck.Checksum.File
-        if HeaderSum & 0x11:
+        if HeaderSum & 0xff:
             Header = self.Header.IntegrityCheck.Checksum.Header + 0x100 - int(hex(HeaderSum)[-2:], 16)
             self.Header.IntegrityCheck.Checksum.Header = int(hex(Header)[-2:], 16)
 
