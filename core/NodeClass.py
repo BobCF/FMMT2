@@ -82,28 +82,25 @@ class FvNode:
 
     def ModFvExt(self):
         # Modify ExtHeader
+        print('Modify Fv ExtHeader!')
         if self.Header.ExtHeaderOffset and self.ExtEntryExist and self.ExtTypeExist and self.ExtEntry.Hdr.ExtEntryType == 0x03:
-            print('Modify Fv ExtHeader!')
             self.ExtEntry.UsedSize = self.Header.FvLength - self.Free_Space
 
 # Delta_Size = NewSize - OriSize
     def ModFvSize(self):
-        # if Delta_Size:
-        #     # Modify FvLength
-        #     self.Header.FvLength += Delta_Size
-        # Modify BlockMap
+        print('ModFvSize')
         BlockMapNum = len(self.Header.BlockMap)
         for i in range(BlockMapNum):
             if self.Header.BlockMap[i].Length:
                 self.Header.BlockMap[i].NumBlocks = self.Header.FvLength // self.Header.BlockMap[i].Length
 
     def ModExtHeaderData(self):
-        # pass
+        print('ModExtHeaderData')
         if self.Header.ExtHeaderOffset:
             ExtHeaderData = struct2stream(self.ExtHeader)
             ExtHeaderDataOffset = self.Header.ExtHeaderOffset - self.HeaderLength
             self.Data = self.Data[:ExtHeaderDataOffset] + ExtHeaderData + self.Data[ExtHeaderDataOffset+20:]
-        if self.ExtEntryExist:
+        if self.Header.ExtHeaderOffset and self.ExtEntryExist:
             ExtHeaderEntryData = struct2stream(self.ExtEntry)
             ExtHeaderEntryDataOffset = self.Header.ExtHeaderOffset + 20 - self.HeaderLength
             self.Data = self.Data[:ExtHeaderEntryDataOffset] + ExtHeaderEntryData + self.Data[ExtHeaderEntryDataOffset+len(ExtHeaderEntryData):]

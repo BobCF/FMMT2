@@ -29,8 +29,8 @@ def ParserFile(inputfile, outputfile, ROOT_TYPE):
     FmmtParser.WholeFvTree.parserTree(FmmtParser.BinaryInfo)
     SaveTreeInfo(FmmtParser.BinaryInfo, "Log\Parser_{}.log".format(os.path.basename(inputfile)))
     # 4. Data Encapsultion
-    FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)
     if outputfile:
+        FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)
         with open(outputfile, "wb") as f:
             f.write(FmmtParser.FinalData)
 
@@ -50,27 +50,16 @@ def DeleteFfs(inputfile, TargetFfs_name, outputfile, Fv_name=None):
         for item in FmmtParser.WholeFvTree.Findlist:
             if item.Parent.key != Fv_name and item.Parent.Data.Name != Fv_name:
                 FmmtParser.WholeFvTree.Findlist.remove(item)
-    print(FmmtParser.WholeFvTree.Findlist)
-    print(FmmtParser.WholeFvTree.Findlist[0].Data.Name)
     if FmmtParser.WholeFvTree.Findlist != []:
         for Delete_Ffs in FmmtParser.WholeFvTree.Findlist:
-            Delete_Fv = Delete_Ffs.Parent
-            Free_Space_Data = Delete_Ffs.Data.Size * b'\xff' + Delete_Ffs.Data.PadData
-            if Delete_Fv.Data.Free_Space:
-                Delete_Fv.Child[-1].Data.Data += Free_Space_Data
-            else:
-                New_Free_Space_Info = FfsNode(Free_Space_Data)
-                New_Free_Space_Info.Data = Free_Space_Data
-                New_Ffs_Tree = NODETREE(New_Free_Space_Info.Name)
-                New_Ffs_Tree.type = FFS_FREE_SPACE
-                New_Ffs_Tree.Data = New_Free_Space_Info
-                Delete_Fv.insertChild(New_Ffs_Tree)
-            Delete_Fv.Child.remove(Delete_Ffs)
-        FmmtParser.CompressData(Delete_Fv)
+            FfsMod = FfsModify(None, Delete_Ffs)
+            Status = FfsMod.DeleteFfs()
+            print('Status', Status)
     # 4. Data Encapsultion
-    FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)
-    with open(outputfile, "wb") as f:
-        f.write(FmmtParser.FinalData)
+    if Status:
+        FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)
+        with open(outputfile, "wb") as f:
+            f.write(FmmtParser.FinalData)
 
 def AddNewFfs(inputfile, Fv_name, newffsfile, outputfile):
     # 1. Data Prepare
@@ -94,18 +83,15 @@ def AddNewFfs(inputfile, Fv_name, newffsfile, outputfile):
                 NewFmmtParser.ParserFromRoot(NewFmmtParser.WholeFvTree, new_ffs_data, TargetFfsPad.Data.HOffset)
             else:
                 NewFmmtParser.ParserFromRoot(NewFmmtParser.WholeFvTree, new_ffs_data, TargetFfsPad.Data.HOffset+TargetFfsPad.Data.Size)
-            print('NewFmmtParser.WholeFvTree.Child', NewFmmtParser.WholeFvTree.Child[0].Data.Name)
-            print('TargetFfsPad', TargetFfsPad.Data.Name)
             FfsMod = FfsModify(NewFmmtParser.WholeFvTree.Child[0], TargetFfsPad)
             Status = FfsMod.AddFfs()
-            print('Status', Status)
-        # 4. Data Encapsultion
-        if Status:
-            FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)
-            with open(outputfile, "wb") as f:
-                f.write(FmmtParser.FinalData)
     else:
         print('Target Fv not found!!!')
+    # 4. Data Encapsultion
+    if Status:
+        FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)
+        with open(outputfile, "wb") as f:
+            f.write(FmmtParser.FinalData)
 
 def ReplaceFfs(inputfile, Ffs_name, newffsfile, outputfile, Fv_name=None):
     # 1. Data Prepare
@@ -146,10 +132,10 @@ def ExtractFfs(inputfile, Ffs_name, outputfile):
     FmmtParser.WholeFvTree.FindNode(Ffs_name, FmmtParser.WholeFvTree.Findlist)
     if FmmtParser.WholeFvTree.Findlist != []:
         TargetNode = FmmtParser.WholeFvTree.Findlist[0]
-        print(type(TargetNode.Data.Header.Size[0]))
-        print(hex(TargetNode.Data.Header.Size[0]))
-        print(hex(TargetNode.Data.Header.Size[1]))
-        print(hex(TargetNode.Data.Header.Size[2]))
+        TargetFv = TargetNode.Parent
+        if TargetFv.Data.Header.Attributes & EFI_FVB2_ERASE_POLARITY:
+            TargetNode.Data.Header.State = c_uint8(
+                ~TargetNode.Data.Header.State)
         FinalData = struct2stream(TargetNode.Data.Header) + TargetNode.Data.Data
         with open(outputfile, "wb") as f:
             f.write(FinalData)
