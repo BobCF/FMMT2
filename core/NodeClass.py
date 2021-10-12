@@ -63,7 +63,7 @@ class FvNode:
         self.ROffset = 0
         self.Data = b''
         if self.Header.Signature != 1213613663:
-            print(self.Header.Signature)
+            print('Invalid! Fv Header Signature {} is not "_FVH".'.format(self.Header.Signature))
             with open(str(self.Name)+'.fd', "wb") as f:
                 f.write(struct2stream(self.Header))
             assert False
@@ -72,6 +72,7 @@ class FvNode:
         self.ModCheckSum()
 
     def ModCheckSum(self):
+        # Fv Header Sums to 0.
         Header = struct2stream(self.Header)[::-1]
         Size = self.HeaderLength // 2
         Sum = 0
@@ -81,21 +82,18 @@ class FvNode:
             self.Header.Checksum = int(hex(0x10000 - int(hex(Sum - self.Header.Checksum)[-4:], 16)), 16)
 
     def ModFvExt(self):
-        # Modify ExtHeader
-        print('Modify Fv ExtHeader!')
+        # If used space changes and self.ExtEntry.UsedSize exists, self.ExtEntry.UsedSize need to be changed.
         if self.Header.ExtHeaderOffset and self.ExtEntryExist and self.ExtTypeExist and self.ExtEntry.Hdr.ExtEntryType == 0x03:
             self.ExtEntry.UsedSize = self.Header.FvLength - self.Free_Space
 
-# Delta_Size = NewSize - OriSize
     def ModFvSize(self):
-        print('ModFvSize')
+        # If Fv Size changed, self.Header.FvLength and self.Header.BlockMap[i].NumBlocks need to be changed.
         BlockMapNum = len(self.Header.BlockMap)
         for i in range(BlockMapNum):
             if self.Header.BlockMap[i].Length:
                 self.Header.BlockMap[i].NumBlocks = self.Header.FvLength // self.Header.BlockMap[i].Length
 
     def ModExtHeaderData(self):
-        print('ModExtHeaderData')
         if self.Header.ExtHeaderOffset:
             ExtHeaderData = struct2stream(self.ExtHeader)
             ExtHeaderDataOffset = self.Header.ExtHeaderOffset - self.HeaderLength
@@ -110,7 +108,7 @@ class FfsNode:
         self.Header = EFI_FFS_FILE_HEADER.from_buffer_copy(buffer)
         # self.Attributes = unpack("<B", buffer[21:22])[0]
         if self.Header.Size != 0 and self.Header.Attributes == 0x01:
-            print('Error Ffs Header!')
+            print('Error Ffs Header! Ffs Header Size and Attributes is not matched!')
         if self.Header.Size == 0 and self.Header.Attributes == 0x01:
             self.Header = EFI_FFS_FILE_HEADER2.from_buffer_copy(buffer)
         self.Name = uuid.UUID(bytes_le=struct2stream(self.Header.Name))
@@ -174,7 +172,6 @@ class SectionNode:
             return Get_USER_INTERFACE_Header(nums//2).from_buffer_copy(buffer)
         elif Type == 0x18:
             return EFI_FREEFORM_SUBTYPE_GUID_SECTION.from_buffer_copy(buffer)
-
 
 class FreeSpaceNode:
     def __init__(self, buffer: bytes):

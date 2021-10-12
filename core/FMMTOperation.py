@@ -15,6 +15,7 @@ def SaveTreeInfo(TreeInfo, outputname):
     with open(outputname, "w") as f:
         for item in TreeInfo:
             f.writelines(item + '\n')
+    print('Log saved in {}'.format(os.path.abspath(outputname)))
 
 # The ROOT_TYPE can be 'ROOT_TREE', 'ROOT_FV_TREE', 'ROOT_FFS_TREE', 'ROOT_SECTION_TREE'
 def ParserFile(inputfile, outputfile, ROOT_TYPE):
@@ -22,12 +23,12 @@ def ParserFile(inputfile, outputfile, ROOT_TYPE):
     with open(inputfile, "rb") as f:
         whole_data = f.read()
     FmmtParser = FMMTParser(inputfile, ROOT_TYPE)
-    print("\nParserData Start!\n")
+    print("\nParserFile Start!\n")
     # 2. DataTree Create
     FmmtParser.ParserFromRoot(FmmtParser.WholeFvTree, whole_data)
     # 3. Log Output
     FmmtParser.WholeFvTree.parserTree(FmmtParser.BinaryInfo)
-    SaveTreeInfo(FmmtParser.BinaryInfo, "Log\Parser_{}.log".format(os.path.basename(inputfile)))
+    SaveTreeInfo(FmmtParser.BinaryInfo, "Parser_{}.log".format(os.path.basename(inputfile)))
     # 4. Data Encapsultion
     if outputfile:
         FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)
@@ -44,7 +45,6 @@ def DeleteFfs(inputfile, TargetFfs_name, outputfile, Fv_name=None):
     FmmtParser.WholeFvTree.parserTree(FmmtParser.BinaryInfo)
     # 3. Data Modify
     FmmtParser.WholeFvTree.FindNode(TargetFfs_name, FmmtParser.WholeFvTree.Findlist)
-    print(FmmtParser.WholeFvTree.Findlist)
     # Choose the Specfic DeleteFfs with Fv info
     if Fv_name:
         for item in FmmtParser.WholeFvTree.Findlist:
@@ -54,7 +54,8 @@ def DeleteFfs(inputfile, TargetFfs_name, outputfile, Fv_name=None):
         for Delete_Ffs in FmmtParser.WholeFvTree.Findlist:
             FfsMod = FfsModify(None, Delete_Ffs)
             Status = FfsMod.DeleteFfs()
-            print('Status', Status)
+    else:
+        print('Target Ffs not found!!!')
     # 4. Data Encapsultion
     if Status:
         FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)
@@ -117,7 +118,8 @@ def ReplaceFfs(inputfile, Ffs_name, newffsfile, outputfile, Fv_name=None):
         for TargetFfs in FmmtParser.WholeFvTree.Findlist:
             FfsMod = FfsModify(newFmmtParser.WholeFvTree.Child[0], TargetFfs)
             Status = FfsMod.ReplaceFfs()
-            print('Status', Status)
+    else:
+        print('Target Ffs not found!!!')
     # 4. Data Encapsultion
     if Status:
         FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)
@@ -140,4 +142,4 @@ def ExtractFfs(inputfile, Ffs_name, outputfile):
         with open(outputfile, "wb") as f:
             f.write(FinalData)
     else:
-        print('Could not find the target ffs!')
+        print('Target Ffs not found!!!')

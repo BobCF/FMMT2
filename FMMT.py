@@ -36,9 +36,9 @@ class FMMT():
         self.firmware_packet = {}
     
     def CheckFfsName(self, FfsName):
-        if len(FfsName) == 36:
+        try:
             return uuid.UUID(FfsName)
-        else:
+        except:
             return FfsName
 
     def View(self, ParaList):
@@ -84,7 +84,6 @@ class FMMT():
 
 def main():
     args = parser.parse_args()
-    print(args)
     status = 0
 
     logger = logging.getLogger('FMMT')
@@ -102,7 +101,6 @@ def main():
         if args.Delete:
             fmmt.Delete(args.Delete)
         if args.Extract:
-            print(args.Extract)
             fmmt.Extract(args.Extract)
         if args.Add:
             fmmt.Add(args.Add)

@@ -34,6 +34,7 @@ class EFI_FV_BLOCK_MAP_ENTRY(Structure):
         ('Length',               c_uint32),
     ]
 
+# Get data from ctypes to bytes.
 def struct2stream(s):
     length = sizeof(s)
     p = cast(pointer(s), POINTER(c_char * length))

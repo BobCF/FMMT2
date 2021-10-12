@@ -17,7 +17,6 @@ logger.addHandler(lh)
 
 def ModifyGuidFormat(target_guid):
     target_guid = target_guid.replace('-', '')
-    # print('target_guid', target_guid)
     target_list = []
     start = [0,8,12,16,18,20,22,24,26,28,30]
     end = [8,12,16,18,20,22,24,26,28,30,32]
@@ -25,10 +24,8 @@ def ModifyGuidFormat(target_guid):
     for pos in range(num):
         new_value = int(target_guid[start[pos]:end[pos]], 16)
         target_list.append(new_value)
-    # print('target_list', target_list)
     new_format = GUID()
     new_format.from_list(target_list)
-    # print('new_format', new_format)
     return new_format
 
 class GUIDTool:
@@ -52,9 +49,7 @@ class GUIDTool:
                 file.close()
                 command = [tool, '-e', '-o', ToolOuputFile,
                                   ToolInputFile]
-                print('command_start', command)
                 os.system(' '.join(command))
-                print('command_end', command)
                 buf = open(ToolOuputFile, "rb")
                 res_buffer = buf.read()
             except Exception as msg:
@@ -62,7 +57,6 @@ class GUIDTool:
                 return ""
             else:
                 buf.close()
-                print('Before remove!')
                 if os.path.exists(tmp):
                     shutil.rmtree(tmp)
                 return res_buffer
@@ -88,9 +82,7 @@ class GUIDTool:
                 file.write(buffer)
                 file.close()
                 command = [tool, '-d', '-o', ToolOuputFile, ToolInputFile]
-                print('command_start', command)
                 os.system(' '.join(command))
-                print('command_end', command)
                 buf = open(ToolOuputFile, "rb")
                 res_buffer = buf.read()
             except Exception as msg:
@@ -98,7 +90,6 @@ class GUIDTool:
                 return ""
             else:
                 buf.close()
-                print('Before remove!')
                 if os.path.exists(tmp):
                     shutil.rmtree(tmp)
                 return res_buffer
@@ -107,56 +98,16 @@ class GUIDTool:
             logger.info("Its GUID is: %s" % self.guid)
             return ""
 
-
-class TianoCompress(GUIDTool):
-    def pack(self, *args, **kwargs):
-        pass
-
-    def unpack(self, *args, **kwargs):
-        pass
-
-
-class LzmaCompress(GUIDTool):
-    def pack(self, *args, **kwargs):
-        pass
-
-    def unpack(self, *args, **kwargs):
-        pass
-
-
-class GenCrc32(GUIDTool):
-    def pack(self, *args, **kwargs):
-        pass
-
-    def unpack(self, *args, **kwargs):
-        pass
-
-
-class LzmaF86Compress(GUIDTool):
-    def pack(self, *args, **kwargs):
-        pass
-
-    def unpack(self, *args, **kwargs):
-        pass
-
-
-class BrotliCompress(GUIDTool):
-    def pack(self, *args, **kwargs):
-        pass
-
-    def unpack(self, *args, **kwargs):
-        pass
-
 class GUIDTools:
     '''
     GUIDTools is responsible for reading FMMTConfig.ini, verify the tools and provide interfaces to access those tools.
     '''
     default_tools = {
-        uuid.UUID("{a31280ad-481e-41b6-95e8-127f4c984779}"): TianoCompress("a31280ad-481e-41b6-95e8-127f4c984779", "TIANO", "TianoCompress"),
-        uuid.UUID("{ee4e5898-3914-4259-9d6e-dc7bd79403cf}"): LzmaCompress("ee4e5898-3914-4259-9d6e-dc7bd79403cf", "LZMA", "LzmaCompress"),
-        uuid.UUID("{fc1bcdb0-7d31-49aa-936a-a4600d9dd083}"): GenCrc32("fc1bcdb0-7d31-49aa-936a-a4600d9dd083", "CRC32", "GenCrc32"),
-        uuid.UUID("{d42ae6bd-1352-4bfb-909a-ca72a6eae889}"): LzmaF86Compress("d42ae6bd-1352-4bfb-909a-ca72a6eae889", "LZMAF86", "LzmaF86Compress"),
-        uuid.UUID("{3d532050-5cda-4fd0-879e-0f7f630d5afb}"): BrotliCompress("3d532050-5cda-4fd0-879e-0f7f630d5afb", "BROTLI", "BrotliCompress")
+        struct2stream(ModifyGuidFormat("a31280ad-481e-41b6-95e8-127f4c984779")): GUIDTool("a31280ad-481e-41b6-95e8-127f4c984779", "TIANO", "TianoCompress"),
+        struct2stream(ModifyGuidFormat("ee4e5898-3914-4259-9d6e-dc7bd79403cf")): GUIDTool("ee4e5898-3914-4259-9d6e-dc7bd79403cf", "LZMA", "LzmaCompress"),
+        struct2stream(ModifyGuidFormat("fc1bcdb0-7d31-49aa-936a-a4600d9dd083")): GUIDTool("fc1bcdb0-7d31-49aa-936a-a4600d9dd083", "CRC32", "GenCrc32"),
+        struct2stream(ModifyGuidFormat("d42ae6bd-1352-4bfb-909a-ca72a6eae889")): GUIDTool("d42ae6bd-1352-4bfb-909a-ca72a6eae889", "LZMAF86", "LzmaF86Compress"),
+        struct2stream(ModifyGuidFormat("3d532050-5cda-4fd0-879e-0f7f630d5afb")): GUIDTool("3d532050-5cda-4fd0-879e-0f7f630d5afb", "BROTLI", "BrotliCompress"),
     }
 
     def __init__(self, tooldef_file=None):
@@ -193,22 +144,18 @@ class GUIDTools:
             for line in config_data:
                 try:
                     guid, short_name, command = line.split()
-                    print('guid.strip()', guid.strip())
                     new_format_guid = struct2stream(ModifyGuidFormat(guid.strip()))
-                    print('new_format_guid', new_format_guid)
                     self.tooldef[new_format_guid] = GUIDTool(
                         guid.strip(), short_name.strip(), command.strip())
                 except:
-                    print("error")
+                    print("GuidTool load error!")
                     continue
         else:
             self.tooldef.update(self.default_tools)
 
         self.VerifyTools()
-        # self.UpdateTools()
 
     def __getitem__(self, guid):
-        print('self.tooldef', self.tooldef)
         return self.tooldef.get(guid)
 
 

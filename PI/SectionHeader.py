@@ -77,7 +77,6 @@ def Get_USER_INTERFACE_Header(nums):
         def GetUiString(self):
             UiString = ''
             for i in range(nums):
-                print('self.FileNameString[i]', self.FileNameString[i])
                 if self.FileNameString[i]:
                     UiString += chr(self.FileNameString[i])
             return UiString
@@ -98,7 +97,6 @@ def Get_VERSION_Header(nums):
         def GetVersionString(self):
             VersionString = ''
             for i in range(nums):
-                print('self.VersionString[i]', self.VersionString[i])
                 if self.VersionString[i]:
                     VersionString += chr(self.VersionString[i])
             return VersionString

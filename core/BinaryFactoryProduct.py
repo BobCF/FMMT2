@@ -48,27 +48,21 @@ class FdFactory(BinaryFactory):
 class SectionProduct(BinaryProduct):
     ## Decompress the compressed section.
     def ParserData(self, Section_Tree, whole_Data, Rel_Whole_Offset = 0):
-        print("Start DeCompressSection")
-        print(Section_Tree.Data.Type)
         if Section_Tree.Data.Type == 0x01:
             Section_Tree.Data.OriData = Section_Tree.Data.Data
             self.ParserFfs(Section_Tree, b'')
+        # Guided Define Section
         elif Section_Tree.Data.Type == 0x02:
-            print("GuidTool*************************************************")
-            print('len(Section_Tree.Data.Data)', len(Section_Tree.Data.Data))
             Section_Tree.Data.OriData = Section_Tree.Data.Data
             DeCompressGuidTool = Section_Tree.Data.ExtHeader.SectionDefinitionGuid
             Section_Tree.Data.Data = self.DeCompressData(DeCompressGuidTool, Section_Tree.Data.Data)
             Section_Tree.Data.Size = len(Section_Tree.Data.Data) + Section_Tree.Data.HeaderLength
-            print('\n      Size of Data Decompressed: {}!'.format(len(Section_Tree.Data.Data)))
-            print('      Data Decompressed!')
             self.ParserFfs(Section_Tree, b'')
         elif Section_Tree.Data.Type == 0x03:
             Section_Tree.Data.OriData = Section_Tree.Data.Data
-            # Section_Tree.Data.Data = self.Decompress(Section_Tree.Data.Data)
             self.ParserFfs(Section_Tree, b'')
+        # SEC_FV Section
         elif Section_Tree.Data.Type == 0x17:
-            print("SecFV*************************************************")
             Sec_Fv_Info = FvNode(Fv_count, Section_Tree.Data.Data)
             Sec_Fv_Tree = NODETREE('FV'+ str(Fv_count))
             Sec_Fv_Tree.type = SEC_FV_TREE
@@ -79,51 +73,35 @@ class SectionProduct(BinaryProduct):
             Section_Tree.insertChild(Sec_Fv_Tree)
 
     def ParserFfs(self, ParTree, Whole_Data, Rel_Whole_Offset = 0):
-        print('\nSection ParserFfs Start!')
-        print('SectionFfs {} - Section '.format(ParTree.key))
-        # Section_Count = 0
         Rel_Offset = 0
         Section_Offset = 0
+        # Get the Data from parent tree, if do not have the tree then get it from the whole_data.
         if ParTree.Data != None:
             Data_Size = len(ParTree.Data.Data)
             Section_Offset = ParTree.Data.DOffset
             Whole_Data = ParTree.Data.Data
         else:
             Data_Size = len(Whole_Data)
-        print('  Ffs Data_Size', Data_Size)
-        print('  Ffs Data Offset', Section_Offset)
-        # print('  Ffs Header Offset', ParTree.Data.HOffset)
+        # Parser all the data to collect all the Section recorded in its Parent Section.
         while Rel_Offset < Data_Size:
-            print('  Rel_Offset', Rel_Offset)
+            # Create a SectionNode and set it as the SectionTree's Data
             Section_Info = SectionNode(Whole_Data[Rel_Offset:])
-            # Section_Info = SectionNode(Section_Count, Whole_Data[Rel_Offset:])
             Section_Tree = NODETREE(Section_Info.Name)
-            print('      GetSection: ', Section_Info.Name)
             Section_Tree.type = SECTION_TREE
             Section_Info.Data = Whole_Data[Rel_Offset+Section_Info.HeaderLength: Rel_Offset+Section_Info.Size]
             Section_Info.DOffset = Section_Offset + Section_Info.HeaderLength + Rel_Whole_Offset
-            print('      Section RelDataRange:', Rel_Offset+Section_Info.HeaderLength, Rel_Offset+Section_Info.Size)
-            print('      Section DataRange:', Section_Offset+Section_Info.HeaderLength, Section_Offset+Section_Info.Size)
-            print('      Section_Info.Header.Type', Section_Info.Header.Type)
-            print('      Section_Info.Header.Common_Header_Size', Section_Info.Header.Common_Header_Size())
             Section_Info.HOffset = Section_Offset + Rel_Whole_Offset
             Section_Info.ROffset = Rel_Offset
-            print('      Section_Info.Data length', len(Section_Info.Data))
-            print('      Section_Info.Size', Section_Info.Size)
             if Section_Info.Header.Type == 0:
-                print('Ffs Finished!')
                 break
+            # The final Section in parent Section does not need to add padding, else must be 4-bytes align with parent Section start offset
             Pad_Size = 0
             if (Rel_Offset+Section_Info.HeaderLength+len(Section_Info.Data) != Data_Size):
                 Pad_Size = GetPadSize(Section_Info.Size, 4)
                 Section_Info.PadData = Pad_Size * b'\x00'
-                print('      Add PadDataSize: ', Pad_Size)
-            print("**************************OriType", Section_Info.Header.Type)
             if Section_Info.Header.Type == 0x02:
                 Section_Info.DOffset = Section_Offset + Section_Info.ExtHeader.DataOffset + Rel_Whole_Offset
                 Section_Info.Data = Whole_Data[Rel_Offset+Section_Info.ExtHeader.DataOffset: Rel_Offset+Section_Info.Size]
-                print('      Section_Info.DOffset', Section_Info.DOffset)
-                print('      Section_Info.ExtHeader.DataOffset', Section_Info.ExtHeader.DataOffset)
             if Section_Info.Header.Type == 0x14:
                 ParTree.Data.Version = Section_Info.ExtHeader.GetVersionString()
             if Section_Info.Header.Type == 0x15:
@@ -136,51 +114,36 @@ class SectionProduct(BinaryProduct):
 class FfsProduct(BinaryProduct):
     # ParserFFs / GetSection
     def ParserData(self, ParTree, Whole_Data, Rel_Whole_Offset = 0):
-        print('\nParserFfs Start!')
-        print('{} {} - Section '.format(ParTree.key, ParTree.Data.UiName))
-        # Section_Count = 0
         Rel_Offset = 0
         Section_Offset = 0
+        # Get the Data from parent tree, if do not have the tree then get it from the whole_data.
         if ParTree.Data != None:
             Data_Size = len(ParTree.Data.Data)
             Section_Offset = ParTree.Data.DOffset
             Whole_Data = ParTree.Data.Data
         else:
             Data_Size = len(Whole_Data)
-        print('  Ffs Data_Size', Data_Size)
-        print('  Ffs Data Offset', Section_Offset)
-        # print('  Ffs Header Offset', ParTree.Data.HOffset)
+        # Parser all the data to collect all the Section recorded in Ffs.
         while Rel_Offset < Data_Size:
-            print('  Rel_Offset', Rel_Offset)
+            # Create a SectionNode and set it as the SectionTree's Data
             Section_Info = SectionNode(Whole_Data[Rel_Offset:])
-            # Section_Info = SectionNode(Section_Count, Whole_Data[Rel_Offset:])
             Section_Tree = NODETREE(Section_Info.Name)
-            print('      GetSection: ', Section_Info.Name)
             Section_Tree.type = SECTION_TREE
             Section_Info.Data = Whole_Data[Rel_Offset+Section_Info.HeaderLength: Rel_Offset+Section_Info.Size]
             Section_Info.DOffset = Section_Offset + Section_Info.HeaderLength + Rel_Whole_Offset
-            print('      Section RelDataRange:', Rel_Offset+Section_Info.HeaderLength, Rel_Offset+Section_Info.Size)
-            print('      Section DataRange:', Section_Offset+Section_Info.HeaderLength, Section_Offset+Section_Info.Size)
-            print('      Section_Info.Header.Type', Section_Info.Header.Type)
-            print('      Section_Info.Header.Common_Header_Size', Section_Info.Header.Common_Header_Size())
             Section_Info.HOffset = Section_Offset + Rel_Whole_Offset
             Section_Info.ROffset = Rel_Offset
-            print('      Section_Info.Data length', len(Section_Info.Data))
-            print('      Section_Info.Size', Section_Info.Size)
             if Section_Info.Header.Type == 0:
-                print('Ffs Finished!')
                 break
+            # The final Section in Ffs does not need to add padding, else must be 4-bytes align with Ffs start offset
             Pad_Size = 0
             if (Rel_Offset+Section_Info.HeaderLength+len(Section_Info.Data) != Data_Size):
                 Pad_Size = GetPadSize(Section_Info.Size, 4)
                 Section_Info.PadData = Pad_Size * b'\x00'
-                print('      Add PadDataSize: ', Pad_Size)
-            print("**************************OriType", Section_Info.Header.Type)
             if Section_Info.Header.Type == 0x02:
                 Section_Info.DOffset = Section_Offset + Section_Info.ExtHeader.DataOffset + Rel_Whole_Offset
                 Section_Info.Data = Whole_Data[Rel_Offset+Section_Info.ExtHeader.DataOffset: Rel_Offset+Section_Info.Size]
-                print('      Section_Info.DOffset', Section_Info.DOffset)
-                print('      Section_Info.ExtHeader.DataOffset', Section_Info.ExtHeader.DataOffset)
+            # If Section is Version or UI type, it saves the version and UI info of its parent Ffs.
             if Section_Info.Header.Type == 0x14:
                 ParTree.Data.Version = Section_Info.ExtHeader.GetVersionString()
             if Section_Info.Header.Type == 0x15:
@@ -189,13 +152,10 @@ class FfsProduct(BinaryProduct):
             Rel_Offset += Section_Info.Size + Pad_Size
             Section_Tree.Data = Section_Info
             ParTree.insertChild(Section_Tree)
-        print('{} {} - Section '.format(ParTree.key, ParTree.Data.UiName))
 
 class FvProduct(BinaryProduct):
     ##  ParserFv / GetFfs
     def ParserData(self, ParTree, Whole_Data, Rel_Whole_Offset = 0):
-        print('\nParserFv Start!')
-        # print('{} {} - Ffs '.format(ParTree.key, ParTree.Data.Name))
         Ffs_Offset = 0
         Rel_Offset = 0
         # Get the Data from parent tree, if do not have the tree then get it from the whole_data.
@@ -221,10 +181,7 @@ class FvProduct(BinaryProduct):
                 Ffs_Info = FfsNode(Whole_Data[Rel_Offset:])
                 Ffs_Tree = NODETREE(Ffs_Info.Name)
                 Ffs_Info.HOffset = Ffs_Offset + Rel_Whole_Offset
-                print('   GetFfsHOffset: ', Ffs_Info.HOffset)
                 Ffs_Info.DOffset = Ffs_Offset + Ffs_Info.Header.HeaderLength + Rel_Whole_Offset
-                print('   GetFfsDOffset: ', Ffs_Info.DOffset)
-                print('   GetFfsSize: ', Ffs_Info.Size)
                 Ffs_Info.ROffset = Rel_Offset
                 if Ffs_Info.Name == PADVECTOR:
                     Ffs_Tree.type = FFS_PAD
@@ -244,19 +201,10 @@ class FvProduct(BinaryProduct):
                 if Ffs_Tree.type != FFS_FREE_SPACE and (Rel_Offset+Ffs_Info.Header.HeaderLength+len(Ffs_Info.Data) != Data_Size):
                     Pad_Size = GetPadSize(Ffs_Info.Size, 8)
                     Ffs_Info.PadData = Pad_Size * b'\xff'
-                    print('  Add PadDataSize:{} PadData:{} '.format(Pad_Size, Ffs_Info.PadData))
                 Ffs_Offset += Ffs_Info.Size + Pad_Size
                 Rel_Offset += Ffs_Info.Size + Pad_Size
                 Ffs_Tree.Data = Ffs_Info
-                # if Ffs_Tree.Data.Header.HeaderLength + len(Ffs_Tree.Data.Data) != Data_Size:
-                print('   Ffs Header Type: ',Ffs_Tree.Data.Header.Type)
                 ParTree.insertChild(Ffs_Tree)
-            print('  GetFfs: ', Ffs_Info.Name)
-            print('   GetFfsSize: ', Ffs_Tree.Data.Size)
-            print('   GetFfsHOffset: ', Ffs_Tree.Data.HOffset)
-            print('   GetFfsDOffset: ', Ffs_Tree.Data.DOffset)
-            print('   RelOffset: ', Rel_Offset)
-            print('   Data_Size: ', Data_Size)
 
 class FdProduct(BinaryProduct):
     type = [ROOT_FV_TREE, ROOT_TREE]
@@ -265,7 +213,6 @@ class FdProduct(BinaryProduct):
     def ParserData(self, WholeFvTree, whole_data=b'', offset = 0):
         # Get all Fv image in Fd with offset and length
         Fd_Struct = self.GetFvFromFd(whole_data)
-        print('Fd_Struct', Fd_Struct)
         data_size = len(whole_data)
         Binary_count = 0
         global Fv_count
@@ -317,7 +264,6 @@ class FdProduct(BinaryProduct):
             Binary_node.Data.Size = len(Binary_node.Data.Data)
             Binary_node.Data.HOffset = Fd_Struct[-1][1]+Fd_Struct[-1][2][0] + offset
             WholeFvTree.insertChild(Binary_node)
-        print('Final:', [x.key for x in WholeFvTree.Child])
 
     ## Get the first level Fv from Fd file.
     def GetFvFromFd(self, whole_data=b''):
@@ -340,7 +286,6 @@ class FdProduct(BinaryProduct):
         while cur_index < data_size:
             if EFI_FIRMWARE_FILE_SYSTEM3_GUID_BYTE in whole_data[cur_index:]:
                 target_index = whole_data[cur_index:].index(EFI_FIRMWARE_FILE_SYSTEM3_GUID_BYTE) + cur_index
-                print(EFI_FIRMWARE_FILE_SYSTEM3_GUID_BYTE, target_index)
                 if whole_data[target_index+24:target_index+28] == FVH_SIGNATURE and whole_data[target_index-16:target_index] == ZEROVECTOR_BYTE:
                     Fd_Struct.append([FV_TREE, target_index - 16, unpack("Q", whole_data[target_index+16:target_index+24])])
                     cur_index = Fd_Struct[-1][1] + Fd_Struct[-1][2][0]
@@ -370,7 +315,6 @@ class FdProduct(BinaryProduct):
             if tmp_struct[i][1]+tmp_struct[i][2][0] < tmp_struct[i-1][1]+tmp_struct[i-1][2][0]:
                 Fd_Struct.remove(Fd_Struct[i-tmp_index])
                 tmp_index += 1
-        print(Fd_Struct)
         return Fd_Struct
 
 class ParserEntry():

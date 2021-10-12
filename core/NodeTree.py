@@ -67,7 +67,6 @@ class NODETREE:
 
     def deleteNode(self, deletekey):
         FindStatus, DeleteTree = self.FindNode(deletekey)
-        print(DeleteTree.key)
         if FindStatus:
             parentTree = DeleteTree.Parent
             lastTree = DeleteTree.LastRel
@@ -88,7 +87,6 @@ class NODETREE:
             return None
 
     def FindNode(self, key, Findlist):
-        print(self.key, key)
         if self.key == key or (self.Data and self.Data.Name == key) or (self.type == FFS_TREE and self.Data.UiName == key):
             Findlist.append(self)
         else:
@@ -104,16 +102,12 @@ class NODETREE:
 
     def parserTree(self, TreeInfo, space =""):
         if self.type == ROOT_TREE or self.type == ROOT_FV_TREE or self.type == ROOT_FFS_TREE or self.type == ROOT_SECTION_TREE:
-            print("Name:{}  Type:{}  FilesNum:{}".format(self.key, self.type, len(self.Child)))
             TreeInfo.append("Name:{}  Type:{}  FilesNum:{}".format(self.key, self.type, len(self.Child)))
         elif self.type == FFS_TREE:
-            print("{}Name:{}  UiName:{}  Version:{}  Type:{}  Size:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.Data.UiName, self.Data.Version, self.type, hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
             TreeInfo.append("{}Name:{}  UiName:{}  Version:{}  Type:{}  Size:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.Data.UiName, self.Data.Version, self.type, hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
         elif self.type == SECTION_TREE and self.Data.Type == 0x02:
-            print("{}Name:{}  Type:{}  Size:{}  DecompressedSize:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.type, hex(len(self.Data.OriData)+self.Data.HeaderLength), hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
             TreeInfo.append("{}Name:{}  Type:{}  Size:{}  DecompressedSize:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.type, hex(len(self.Data.OriData)+self.Data.HeaderLength), hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
         elif self is not None:
-            print("{}Name:{}  Type:{}  Size:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.type, hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
             TreeInfo.append("{}Name:{}  Type:{}  Size:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.type, hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
         space += "  "
         for item in self.Child:

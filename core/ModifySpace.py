@@ -14,6 +14,7 @@ class FfsModify:
         self.Status = False
         self.Remain_New_Free_Space = 0
 
+    ## Use for Compress the Section Data
     def CompressData(self, TargetTree):
         TreePath = TargetTree.GetTreePath()
         pos = len(TreePath)
@@ -82,7 +83,6 @@ class FfsModify:
                     self.Remain_New_Free_Space += Delta_Pad_Size
                     TargetTree.Data.PadData = b'\x00' * New_Pad_Size
             TargetTree.Data.Data = NewData
-            print('test')
         if GuidTool:
             ParPath = os.path.abspath(os.path.dirname(os.path.abspath(__file__))+os.path.sep+"..")
             ToolPath = os.path.join(ParPath, r'FMMTConfig.ini')
@@ -112,7 +112,6 @@ class FfsModify:
                 self.ModifyTest(TargetTree, self.Remain_New_Free_Space)
                 self.Status = False
 
-
     def ModifyFvExtData(self, TreeNode):
         FvExtData = b''
         if TreeNode.Data.Header.ExtHeaderOffset:
@@ -127,12 +126,8 @@ class FfsModify:
             InfoNode.Data.ModCheckSum()
 
     def ModifyTest(self, ParTree, Needed_Space):
-        print('ParTree.type', ParTree.type)
-        print('ParTree.Data.Name', ParTree.Data.Name)
-        print('Needed_Space', Needed_Space)
         if Needed_Space > 0:
             if ParTree.type == FV_TREE or ParTree.type == SEC_FV_TREE:
-                print('', ParTree.Data.Name)
                 ParTree.Data.Data = b''
                 Needed_Space = Needed_Space - ParTree.Data.Free_Space
                 if Needed_Space < 0:
@@ -159,7 +154,6 @@ class FfsModify:
                         ParTree.Data.Data += item.Data.Data + item.Data.PadData
                     else:
                         ParTree.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
-                print('Collection')
                 ParTree.Data.ModFvExt()
                 ParTree.Data.ModFvSize()
                 ParTree.Data.ModExtHeaderData()
@@ -167,7 +161,6 @@ class FfsModify:
                 ParTree.Data.ModCheckSum()
             elif ParTree.type == FFS_TREE:
                 ParTree.Data.Data = b''
-                print('Test')
                 for item in ParTree.Child:
                     if item.Data.OriData:
                         if item.Data.ExtHeader:
@@ -195,16 +188,11 @@ class FfsModify:
                         ParTree.Data.Data += struct2stream(item.Data.Header) + struct2stream(item.Data.ExtHeader) + item.Data.OriData + item.Data.PadData
                     else:
                         ParTree.Data.Data += struct2stream(item.Data.Header) + item.Data.Data + item.Data.PadData
-                print('len(OriData)', len(OriData))
-                print(len(ParTree.Data.Data))
                 if ParTree.Data.Type == 0x02:
                     ParTree.Data.Size += Needed_Space
-                    print('Guid')
                     ParPath = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
                     ToolPath = os.path.join(os.path.dirname(ParPath), r'FMMTConfig.ini')
                     guidtool = GUIDTools(ToolPath).__getitem__(struct2stream(ParTree.Data.ExtHeader.SectionDefinitionGuid))
-                    print('struct2stream(ParTree.Data.ExtHeader.SectionDefinitionGuid)', struct2stream(ParTree.Data.ExtHeader.SectionDefinitionGuid))
-                    print('guidtool', guidtool)
                     CompressedData = guidtool.pack(ParTree.Data.Data)
                     Needed_Space = len(CompressedData) - len(ParTree.Data.OriData)
                     ParTree.Data.OriData = CompressedData
@@ -220,13 +208,11 @@ class FfsModify:
                     else:
                         ParTree.Data.PadData = b''
                 elif Needed_Space:
-                    print('Not Guid')
                     ChangeSize(ParTree, -Needed_Space)
                     New_Pad_Size = GetPadSize(ParTree.Data.Size, 4) 
                     Delta_Pad_Size = New_Pad_Size - len(ParTree.Data.PadData)
                     Needed_Space += Delta_Pad_Size
                     ParTree.Data.PadData = b'\x00' * New_Pad_Size
-                print('OriData == ParTree.Data.Data', OriData == ParTree.Data.Data)
             NewParTree = ParTree.Parent
             ROOT_TYPE = [ROOT_FV_TREE, ROOT_FFS_TREE, ROOT_SECTION_TREE, ROOT_TREE]
             if NewParTree and NewParTree.type not in ROOT_TYPE:
@@ -236,28 +222,36 @@ class FfsModify:
 
     def ReplaceFfs(self):
         TargetFv = self.TargetFfs.Parent
+        # If the Fv Header Attributes is EFI_FVB2_ERASE_POLARITY, Child Ffs Header State need be reversed.
         if TargetFv.Data.Header.Attributes & EFI_FVB2_ERASE_POLARITY:
                 self.NewFfs.Data.Header.State = c_uint8(
                     ~self.NewFfs.Data.Header.State)
+        # NewFfs parsing will not calculate the PadSize, thus recalculate.
         self.NewFfs.Data.PadData = b'\xff' * GetPadSize(self.NewFfs.Data.Size, 8)
         if self.NewFfs.Data.Size > self.TargetFfs.Data.Size:
             Needed_Space = self.NewFfs.Data.Size + len(self.NewFfs.Data.PadData) - self.TargetFfs.Data.Size - len(self.TargetFfs.Data.PadData)
+            # If TargetFv have enough free space, just move part of the free space to NewFfs.
             if TargetFv.Data.Free_Space >= Needed_Space:
+                # Modify TargetFv Child info and NodeTree.
                 TargetFv.Child[-1].Data.Data = b'\xff' * (TargetFv.Data.Free_Space - Needed_Space)
                 TargetFv.Data.Free_Space -= Needed_Space
                 Target_index = TargetFv.Child.index(self.TargetFfs)
                 TargetFv.Child.remove(self.TargetFfs)
                 TargetFv.insertChild(self.NewFfs, Target_index)
+                # Modify TargetFv Header and ExtHeader info.
                 TargetFv.Data.ModFvExt()
                 TargetFv.Data.ModFvSize()
                 TargetFv.Data.ModExtHeaderData()
                 self.ModifyFvExtData(TargetFv)
                 TargetFv.Data.ModCheckSum()
+                # return the Status
                 self.Status = True
+            # If TargetFv do not have enough free space, need move part of the free space of TargetFv's parent Fv to TargetFv/NewFfs.
             else:
                 if TargetFv.type == FV_TREE:
                     self.Status = False
                 else:
+                    # Recalculate TargetFv needed space to keep it match the BlockSize setting.
                     Needed_Space -= TargetFv.Data.Free_Space
                     BlockSize = TargetFv.Data.Header.BlockMap[0].Length
                     New_Add_Len = BlockSize - Needed_Space%BlockSize
@@ -272,6 +266,7 @@ class FfsModify:
                         TargetFv.Child.remove(self.TargetFfs)
                         TargetFv.Data.Free_Space = 0
                         TargetFv.insertChild(self.NewFfs)
+                    # Encapsulate the Fv Data for update.
                     TargetFv.Data.Data = b''
                     for item in TargetFv.Child:
                         if item.type == FFS_FREE_SPACE:
@@ -279,15 +274,18 @@ class FfsModify:
                         else:
                             TargetFv.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
                     TargetFv.Data.Size += Needed_Space
+                    # Modify TargetFv Data Header and ExtHeader info.
                     TargetFv.Data.Header.FvLength = TargetFv.Data.Size
                     TargetFv.Data.ModFvExt()
                     TargetFv.Data.ModFvSize()
                     TargetFv.Data.ModExtHeaderData()
                     self.ModifyFvExtData(TargetFv)
                     TargetFv.Data.ModCheckSum()
+                    # Start free space calculating and moving process.
                     self.ModifyTest(TargetFv.Parent, Needed_Space)
         else:
             New_Free_Space = self.TargetFfs.Data.Size - self.NewFfs.Data.Size
+            # If TargetFv already have free space, move the new free space into it.
             if TargetFv.Data.Free_Space:
                 TargetFv.Child[-1].Data.Data += b'\xff' * New_Free_Space
                 TargetFv.Data.Free_Space += New_Free_Space
@@ -295,6 +293,7 @@ class FfsModify:
                 TargetFv.Child.remove(self.TargetFfs)
                 TargetFv.insertChild(self.NewFfs, Target_index)
                 self.Status = True
+            # If TargetFv do not have free space, create free space for Fv.
             else:
                 New_Free_Space_Tree = NODETREE('FREE_SPACE')
                 New_Free_Space_Tree.type = FFS_FREE_SPACE
@@ -305,6 +304,7 @@ class FfsModify:
                 TargetFv.Child.remove(self.TargetFfs)
                 TargetFv.insertChild(self.NewFfs, Target_index)
                 self.Status = True
+            # Modify TargetFv Header and ExtHeader info.
             TargetFv.Data.ModFvExt()
             TargetFv.Data.ModFvSize()
             TargetFv.Data.ModExtHeaderData()
@@ -313,21 +313,16 @@ class FfsModify:
         return self.Status
 
     def AddFfs(self):
-        print('self.TargetFfs.type', self.TargetFfs.type)
+        # NewFfs parsing will not calculate the PadSize, thus recalculate.
         self.NewFfs.Data.PadData = b'\xff' * GetPadSize(self.NewFfs.Data.Size, 8)
         if self.TargetFfs.type == FFS_FREE_SPACE:
             TargetLen = self.NewFfs.Data.Size + len(self.NewFfs.Data.PadData) - self.TargetFfs.Data.Size - len(self.TargetFfs.Data.PadData)
-            print('self.NewFfs.Data.Size', self.NewFfs.Data.Size)
-            print('self.TargetFfs.Data.Size', self.TargetFfs.Data.Size)
-            print(TargetLen)
             TargetFv = self.TargetFfs.Parent
-            print('NewFfs', self.NewFfs.Data.Name)
-            print('TargetFfs', self.TargetFfs.Data.Name)
-            print('TargetFv', TargetFv.type)
-            print('TargetFv Name', TargetFv.Data.Name)
+            # If the Fv Header Attributes is EFI_FVB2_ERASE_POLARITY, Child Ffs Header State need be reversed.
             if TargetFv.Data.Header.Attributes & EFI_FVB2_ERASE_POLARITY:
                 self.NewFfs.Data.Header.State = c_uint8(
                     ~self.NewFfs.Data.Header.State)
+            # If TargetFv have enough free space, just move part of the free space to NewFfs, split free space to NewFfs and new free space.
             if TargetLen < 0:
                 self.Status = True
                 self.TargetFfs.Data.Data = b'\xff' * (-TargetLen)
@@ -343,16 +338,14 @@ class FfsModify:
                 TargetFv.Child.remove(self.TargetFfs)
                 TargetFv.insertChild(self.NewFfs)
                 ModifyFfsType(self.NewFfs)
+            # If TargetFv do not have enough free space, need move part of the free space of TargetFv's parent Fv to TargetFv/NewFfs.
             else:
                 if TargetFv.type == FV_TREE:
                     self.Status = False
                 elif TargetFv.type == SEC_FV_TREE:
-                    print('SEC_FV_TREE!')
+                    # Recalculate TargetFv needed space to keep it match the BlockSize setting.
                     BlockSize = TargetFv.Data.Header.BlockMap[0].Length
                     New_Add_Len = BlockSize - TargetLen%BlockSize
-                    print('New_Add_Len', New_Add_Len)
-                    print('Child Num', len(TargetFv.Child))
-                    print('TargetFv child', TargetFv.Child[-2], TargetFv.Child[-1])
                     if New_Add_Len % BlockSize:
                         self.TargetFfs.Data.Data = b'\xff' * New_Add_Len
                         self.TargetFfs.Data.Size = New_Add_Len
@@ -364,15 +357,13 @@ class FfsModify:
                         TargetFv.insertChild(self.NewFfs)
                         TargetFv.Data.Free_Space = 0
                     ModifyFfsType(self.NewFfs)
-                    print('Child Num', len(TargetFv.Child))
-                    print('TargetFv Child', TargetFv.Child[-3], TargetFv.Child[-2], TargetFv.Child[-1])
-                    print('\n')
                     TargetFv.Data.Data = b''
                     for item in TargetFv.Child:
                         if item.type == FFS_FREE_SPACE:
                             TargetFv.Data.Data += item.Data.Data + item.Data.PadData
                         else:
                             TargetFv.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
+                    # Encapsulate the Fv Data for update.
                     TargetFv.Data.Size += TargetLen
                     TargetFv.Data.Header.FvLength = TargetFv.Data.Size
                     TargetFv.Data.ModFvExt()
@@ -380,24 +371,20 @@ class FfsModify:
                     TargetFv.Data.ModExtHeaderData()
                     self.ModifyFvExtData(TargetFv)
                     TargetFv.Data.ModCheckSum()
+                    # Start free space calculating and moving process.
                     self.ModifyTest(TargetFv.Parent, TargetLen)
         else:
+            # If TargetFv do not have free space, need directly move part of the free space of TargetFv's parent Fv to TargetFv/NewFfs.
             TargetLen = self.NewFfs.Data.Size + len(self.NewFfs.Data.PadData)
             TargetFv = self.TargetFfs.Parent
-            print('TargetFv', TargetFv.type)
-            print('TargetFv Name', TargetFv.Data.Name)
             if TargetFv.Data.Header.Attributes & EFI_FVB2_ERASE_POLARITY:
                 self.NewFfs.Data.Header.State = c_uint8(
                     ~self.NewFfs.Data.Header.State)
             if TargetFv.type == FV_TREE:
                 self.Status = False
             elif TargetFv.type == SEC_FV_TREE:
-                print('SEC_FV_TREE!')
                 BlockSize = TargetFv.Data.Header.BlockMap[0].Length
                 New_Add_Len = BlockSize - TargetLen%BlockSize
-                print('New_Add_Len', New_Add_Len)
-                print('Child Num', len(TargetFv.Child))
-                ChildNum = len(TargetFv.Child)
                 if New_Add_Len % BlockSize:
                     New_Free_Space = NODETREE('FREE_SPACE')
                     New_Free_Space.type = FFS_FREE_SPACE
@@ -424,7 +411,6 @@ class FfsModify:
                 TargetFv.Data.ModCheckSum()
                 self.ModifyTest(TargetFv.Parent, TargetLen)
         return self.Status
-
 
     def DeleteFfs(self):
         Delete_Ffs = self.TargetFfs
