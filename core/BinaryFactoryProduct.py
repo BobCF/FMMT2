@@ -1,10 +1,10 @@
 from re import T
-from PI.ExtendCType import *
-from PI.Common import *
-from core.NodeClass import *
-from core.NodeTree import *
-from core.BaseFactoryProduct import *
 import copy
+import os
+from PI.Common import *
+from core.BiosTreeNode import *
+from core.BiosTree import *
+from core.GuidTools import *
 
 ROOT_TREE = 'ROOT'
 ROOT_FV_TREE = 'ROOT_FV_TREE'
@@ -20,6 +20,25 @@ SECTION_TREE = 'SECTION'
 SEC_FV_TREE = 'SEC_FV_IMAGE'
 BINARY_DATA = 'BINARY'
 Fv_count = 0
+
+## Abstract factory
+class BinaryFactory():
+    type:list = []
+
+    def Create_Product():
+        pass
+
+class BinaryProduct():
+    ## Use GuidTool to decompress data.
+    def DeCompressData(self, GuidTool, Section_Data):
+        ParPath = os.path.abspath(os.path.dirname(os.path.abspath(__file__))+os.path.sep+"..")
+        ToolPath = os.path.join(ParPath, r'FMMTConfig.ini')
+        guidtool = GUIDTools(ToolPath).__getitem__(struct2stream(GuidTool))
+        DecompressedData = guidtool.unpack(Section_Data)
+        return DecompressedData
+
+    def ParserData():
+        pass
 
 class SectionFactory(BinaryFactory):
     type = [SECTION_TREE]
@@ -64,7 +83,7 @@ class SectionProduct(BinaryProduct):
         # SEC_FV Section
         elif Section_Tree.Data.Type == 0x17:
             Sec_Fv_Info = FvNode(Fv_count, Section_Tree.Data.Data)
-            Sec_Fv_Tree = NODETREE('FV'+ str(Fv_count))
+            Sec_Fv_Tree = BIOSTREE('FV'+ str(Fv_count))
             Sec_Fv_Tree.type = SEC_FV_TREE
             Sec_Fv_Tree.Data = Sec_Fv_Info
             Sec_Fv_Tree.Data.HOffset = Section_Tree.Data.DOffset
@@ -86,7 +105,7 @@ class SectionProduct(BinaryProduct):
         while Rel_Offset < Data_Size:
             # Create a SectionNode and set it as the SectionTree's Data
             Section_Info = SectionNode(Whole_Data[Rel_Offset:])
-            Section_Tree = NODETREE(Section_Info.Name)
+            Section_Tree = BIOSTREE(Section_Info.Name)
             Section_Tree.type = SECTION_TREE
             Section_Info.Data = Whole_Data[Rel_Offset+Section_Info.HeaderLength: Rel_Offset+Section_Info.Size]
             Section_Info.DOffset = Section_Offset + Section_Info.HeaderLength + Rel_Whole_Offset
@@ -127,7 +146,7 @@ class FfsProduct(BinaryProduct):
         while Rel_Offset < Data_Size:
             # Create a SectionNode and set it as the SectionTree's Data
             Section_Info = SectionNode(Whole_Data[Rel_Offset:])
-            Section_Tree = NODETREE(Section_Info.Name)
+            Section_Tree = BIOSTREE(Section_Info.Name)
             Section_Tree.type = SECTION_TREE
             Section_Info.Data = Whole_Data[Rel_Offset+Section_Info.HeaderLength: Rel_Offset+Section_Info.Size]
             Section_Info.DOffset = Section_Offset + Section_Info.HeaderLength + Rel_Whole_Offset
@@ -169,7 +188,7 @@ class FvProduct(BinaryProduct):
         while Rel_Offset < Data_Size:
             # Create a FfsNode and set it as the FFsTree's Data
             if Data_Size - Rel_Offset < 24:
-                Ffs_Tree = NODETREE('Free_Space')
+                Ffs_Tree = BIOSTREE('Free_Space')
                 Ffs_Tree.type = FFS_FREE_SPACE
                 Ffs_Tree.Data = FreeSpaceNode(Whole_Data[Rel_Offset:])
                 Ffs_Tree.Data.HOffset = Ffs_Offset + Rel_Whole_Offset
@@ -179,7 +198,7 @@ class FvProduct(BinaryProduct):
                 Rel_Offset = Data_Size
             else:
                 Ffs_Info = FfsNode(Whole_Data[Rel_Offset:])
-                Ffs_Tree = NODETREE(Ffs_Info.Name)
+                Ffs_Tree = BIOSTREE(Ffs_Info.Name)
                 Ffs_Info.HOffset = Ffs_Offset + Rel_Whole_Offset
                 Ffs_Info.DOffset = Ffs_Offset + Ffs_Info.Header.HeaderLength + Rel_Whole_Offset
                 Ffs_Info.ROffset = Rel_Offset
@@ -218,7 +237,7 @@ class FdProduct(BinaryProduct):
         global Fv_count
         # If the first Fv image is the Binary Fv, add it into the tree. 
         if Fd_Struct[0][1] != 0:
-            Binary_node = NODETREE('BINARY'+ str(Binary_count))
+            Binary_node = BIOSTREE('BINARY'+ str(Binary_count))
             Binary_node.type = BINARY_DATA
             Binary_node.Data = BinaryNode(str(Binary_count))
             Binary_node.Data.Data = whole_data[:Fd_Struct[0][1]]
@@ -227,7 +246,7 @@ class FdProduct(BinaryProduct):
             WholeFvTree.insertChild(Binary_node)
             Binary_count += 1
         # Add the first collected Fv image into the tree.
-        Cur_node = NODETREE(Fd_Struct[0][0]+ str(Fv_count))
+        Cur_node = BIOSTREE(Fd_Struct[0][0]+ str(Fv_count))
         Cur_node.type = Fd_Struct[0][0]
         Cur_node.Data = FvNode(Fv_count, whole_data[Fd_Struct[0][1]:Fd_Struct[0][1]+Fd_Struct[0][2][0]])
         Cur_node.Data.HOffset = Fd_Struct[0][1] + offset
@@ -239,7 +258,7 @@ class FdProduct(BinaryProduct):
         # Add all the collected Fv image and the Binary Fv image between them into the tree.
         for i in range(Fv_num-1):
             if Fd_Struct[i][1]+Fd_Struct[i][2][0] != Fd_Struct[i+1][1]:
-                Binary_node = NODETREE('BINARY'+ str(Binary_count))
+                Binary_node = BIOSTREE('BINARY'+ str(Binary_count))
                 Binary_node.type = BINARY_DATA
                 Binary_node.Data = BinaryNode(str(Binary_count))
                 Binary_node.Data.Data = whole_data[Fd_Struct[i][1]+Fd_Struct[i][2][0]:Fd_Struct[i+1][1]]
@@ -247,7 +266,7 @@ class FdProduct(BinaryProduct):
                 Binary_node.Data.HOffset = Fd_Struct[i][1]+Fd_Struct[i][2][0] + offset
                 WholeFvTree.insertChild(Binary_node)
                 Binary_count += 1
-            Cur_node = NODETREE(Fd_Struct[i+1][0]+ str(Fv_count))
+            Cur_node = BIOSTREE(Fd_Struct[i+1][0]+ str(Fv_count))
             Cur_node.type = Fd_Struct[i+1][0]
             Cur_node.Data = FvNode(Fv_count, whole_data[Fd_Struct[i+1][1]:Fd_Struct[i+1][1]+Fd_Struct[i+1][2][0]])
             Cur_node.Data.HOffset = Fd_Struct[i+1][1] + offset
@@ -257,7 +276,7 @@ class FdProduct(BinaryProduct):
             Fv_count += 1
         # If the final Fv image is the Binary Fv, add it into the tree
         if Fd_Struct[-1][1] + Fd_Struct[-1][2][0] != data_size:
-            Binary_node = NODETREE('BINARY'+ str(Binary_count))
+            Binary_node = BIOSTREE('BINARY'+ str(Binary_count))
             Binary_node.type = BINARY_DATA
             Binary_node.Data = BinaryNode(str(Binary_count))
             Binary_node.Data.Data = whole_data[Fd_Struct[-1][1]+Fd_Struct[-1][2][0]:]

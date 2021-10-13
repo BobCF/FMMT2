@@ -1,21 +1,24 @@
 ## @file
-# This file is used to parser the image as a tree.
+# This file is used to define the functions to operate bios binary file.
 #
 # Copyright (c) 2021-, Intel Corporation. All rights reserved.<BR>
 # SPDX-License-Identifier: BSD-2-Clause-Patent
-
 ##
 from core.FMMTParser import *
-from core.ModifySpace import *
+from core.FvHandler import *
 
 global Fv_count
 Fv_count = 0
 
-def SaveTreeInfo(TreeInfo, outputname):
-    with open(outputname, "w") as f:
-        for item in TreeInfo:
-            f.writelines(item + '\n')
-    print('Log saved in {}'.format(os.path.abspath(outputname)))
+def SaveTreeInfo(TreeInfo, outputname, output_filetype='.txt'):
+    if not os.path.exists("Fmmt_output"):
+        os.makedirs("Fmmt_output")
+    try:
+        with open(os.path.join("Fmmt_output", outputname+output_filetype), "w") as f:
+            for item in TreeInfo:
+                f.writelines(item + '\n')
+    except:
+        print('Log saved in {}'.format(os.path.abspath(outputname)))
 
 # The ROOT_TYPE can be 'ROOT_TREE', 'ROOT_FV_TREE', 'ROOT_FFS_TREE', 'ROOT_SECTION_TREE'
 def ParserFile(inputfile, outputfile, ROOT_TYPE):
@@ -23,7 +26,6 @@ def ParserFile(inputfile, outputfile, ROOT_TYPE):
     with open(inputfile, "rb") as f:
         whole_data = f.read()
     FmmtParser = FMMTParser(inputfile, ROOT_TYPE)
-    print("\nParserFile Start!\n")
     # 2. DataTree Create
     FmmtParser.ParserFromRoot(FmmtParser.WholeFvTree, whole_data)
     # 3. Log Output
@@ -52,7 +54,7 @@ def DeleteFfs(inputfile, TargetFfs_name, outputfile, Fv_name=None):
                 FmmtParser.WholeFvTree.Findlist.remove(item)
     if FmmtParser.WholeFvTree.Findlist != []:
         for Delete_Ffs in FmmtParser.WholeFvTree.Findlist:
-            FfsMod = FfsModify(None, Delete_Ffs)
+            FfsMod = FvHandler(None, Delete_Ffs)
             Status = FfsMod.DeleteFfs()
     else:
         print('Target Ffs not found!!!')
@@ -84,7 +86,7 @@ def AddNewFfs(inputfile, Fv_name, newffsfile, outputfile):
                 NewFmmtParser.ParserFromRoot(NewFmmtParser.WholeFvTree, new_ffs_data, TargetFfsPad.Data.HOffset)
             else:
                 NewFmmtParser.ParserFromRoot(NewFmmtParser.WholeFvTree, new_ffs_data, TargetFfsPad.Data.HOffset+TargetFfsPad.Data.Size)
-            FfsMod = FfsModify(NewFmmtParser.WholeFvTree.Child[0], TargetFfsPad)
+            FfsMod = FvHandler(NewFmmtParser.WholeFvTree.Child[0], TargetFfsPad)
             Status = FfsMod.AddFfs()
     else:
         print('Target Fv not found!!!')
@@ -116,7 +118,7 @@ def ReplaceFfs(inputfile, Ffs_name, newffsfile, outputfile, Fv_name=None):
                 FmmtParser.WholeFvTree.Findlist.remove(item)
     if FmmtParser.WholeFvTree.Findlist != []:
         for TargetFfs in FmmtParser.WholeFvTree.Findlist:
-            FfsMod = FfsModify(newFmmtParser.WholeFvTree.Child[0], TargetFfs)
+            FfsMod = FvHandler(newFmmtParser.WholeFvTree.Child[0], TargetFfs)
             Status = FfsMod.ReplaceFfs()
     else:
         print('Target Ffs not found!!!')

@@ -1,6 +1,12 @@
+## @file
+# This file is used to define the Ffs Header C Struct.
+#
+# Copyright (c) 2021-, Intel Corporation. All rights reserved.<BR>
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+##
 from struct import *
 from ctypes import *
-from PI.ExtendCType import *
+from PI.Common import *
 
 EFI_FFS_FILE_HEADER_LEN = 24
 EFI_FFS_FILE_HEADER2_LEN = 32

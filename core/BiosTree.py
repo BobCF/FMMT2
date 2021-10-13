@@ -1,4 +1,10 @@
-from PI.ExtendCType import *
+## @file
+# This file is used to define the Bios layout tree structure and related operations.
+#
+# Copyright (c) 2021-, Intel Corporation. All rights reserved.<BR>
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+##
+from PI.Common import *
 
 ROOT_TREE = 'ROOT'
 ROOT_FV_TREE = 'ROOT_FV_TREE'
@@ -14,7 +20,7 @@ SECTION_TREE = 'SECTION'
 SEC_FV_TREE = 'SEC_FV_IMAGE'
 BINARY_DATA = 'BINARY'
 
-class NODETREE:
+class BIOSTREE:
     def __init__(self, NodeName):
         self.key = NodeName
         self.type = None
@@ -94,11 +100,11 @@ class NODETREE:
                 item.FindNode(key, Findlist)
 
     def GetTreePath(self):
-        NodeTreePath = [self]
+        BiosTreePath = [self]
         while self.Parent:
-            NodeTreePath.insert(0, self.Parent)
+            BiosTreePath.insert(0, self.Parent)
             self = self.Parent
-        return NodeTreePath
+        return BiosTreePath
 
     def parserTree(self, TreeInfo, space =""):
         if self.type == ROOT_TREE or self.type == ROOT_FV_TREE or self.type == ROOT_FFS_TREE or self.type == ROOT_SECTION_TREE:

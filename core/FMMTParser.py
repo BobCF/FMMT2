@@ -1,20 +1,18 @@
 ## @file
-# This file is used to parser the image as a tree.
+# This file is used to define the interface of Bios Parser.
 #
 # Copyright (c) 2021-, Intel Corporation. All rights reserved.<BR>
 # SPDX-License-Identifier: BSD-2-Clause-Patent
-
 ##
-from PI.ExtendCType import *
 from PI.Common import *
 from core.BinaryFactoryProduct import ParserEntry
-from core.NodeClass import *
-from core.NodeTree import *
+from core.BiosTreeNode import *
+from core.BiosTree import *
 from core.GuidTools import *
 
 class FMMTParser:
     def __init__(self, name, TYPE):
-        self.WholeFvTree = NODETREE(name)
+        self.WholeFvTree = BIOSTREE(name)
         self.WholeFvTree.type = TYPE
         self.FinalData = b''
         self.BinaryInfo = []

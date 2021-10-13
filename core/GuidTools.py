@@ -1,3 +1,9 @@
+## @file
+# This file is used to define the FMMT dependent external tool management class.
+#
+# Copyright (c) 2021-, Intel Corporation. All rights reserved.<BR>
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+##
 import glob
 import logging
 import os
@@ -5,28 +11,12 @@ import shutil
 import sys
 import tempfile
 import uuid
-from PI.ExtendCType import *
+from PI.Common import *
+from utils.FmmtLogger import FmmtLogger as logger
+import subprocess
 
-
-logger = logging.getLogger("Section Type")
-logger.setLevel(logging.DEBUG)
-lh = logging.StreamHandler(sys.stdout)
-lf = logging.Formatter("%(asctime)s- %(levelname)-8s: %(message)s")
-lh.setFormatter(lf)
-logger.addHandler(lh)
-
-def ModifyGuidFormat(target_guid):
-    target_guid = target_guid.replace('-', '')
-    target_list = []
-    start = [0,8,12,16,18,20,22,24,26,28,30]
-    end = [8,12,16,18,20,22,24,26,28,30,32]
-    num = len(start)
-    for pos in range(num):
-        new_value = int(target_guid[start[pos]:end[pos]], 16)
-        target_list.append(new_value)
-    new_format = GUID()
-    new_format.from_list(target_list)
-    return new_format
+def ExecuteCommand(cmd):
+    subprocess.run(cmd,stdout=subprocess.DEVNULL)
 
 class GUIDTool:
     def __init__(self, guid, short_name, command):
@@ -49,7 +39,7 @@ class GUIDTool:
                 file.close()
                 command = [tool, '-e', '-o', ToolOuputFile,
                                   ToolInputFile]
-                os.system(' '.join(command))
+                ExecuteCommand(command)
                 buf = open(ToolOuputFile, "rb")
                 res_buffer = buf.read()
             except Exception as msg:
@@ -82,7 +72,7 @@ class GUIDTool:
                 file.write(buffer)
                 file.close()
                 command = [tool, '-d', '-o', ToolOuputFile, ToolInputFile]
-                os.system(' '.join(command))
+                ExecuteCommand(command)
                 buf = open(ToolOuputFile, "rb")
                 res_buffer = buf.read()
             except Exception as msg:

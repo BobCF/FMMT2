@@ -1,7 +1,21 @@
+## @file
+# This file is used to define the FV Header C Struct.
+#
+# Copyright (c) 2021-, Intel Corporation. All rights reserved.<BR>
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+##
 from ast import Str
 from struct import *
 from ctypes import *
-from PI.ExtendCType import *
+from PI.Common import *
+
+class EFI_FV_BLOCK_MAP_ENTRY(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('NumBlocks',            c_uint32),
+        ('Length',               c_uint32),
+    ]
+
 
 class EFI_FIRMWARE_VOLUME_HEADER(Structure):
     _fields_ = [

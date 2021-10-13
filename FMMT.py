@@ -10,9 +10,7 @@
 # Import Modules
 #
 import argparse
-import logging
 import sys
-import re
 from core.FMMTOperation import *
 
 parser = argparse.ArgumentParser(description='''
@@ -31,81 +29,69 @@ parser.add_argument("-a", "--Add", dest="Add", nargs='+',
 parser.add_argument("-r", "--Replace", dest="Replace", nargs='+',
                     help="Replace a Ffs in a FV: '-r inputfile TargetFfsName newffsfile outputfile'")
 
+def print_banner():
+    print("")
+
 class FMMT():
     def __init__(self):
         self.firmware_packet = {}
-    
+
     def CheckFfsName(self, FfsName):
         try:
             return uuid.UUID(FfsName)
         except:
             return FfsName
 
-    def View(self, ParaList):
+    def View(self, inputfile, outputfile=None):
         # ParserFile(inputfile, outputfile, ROOT_TYPE)
-        filetype = os.path.splitext(ParaList[0])[1]
-        print(filetype)
-        if re.search(filetype, '.Fd', re.IGNORECASE):
+        filetype = os.path.splitext(inputfile)[1].lower()
+        if filetype == '.fd':
             ROOT_TYPE = ROOT_TREE
-        elif re.search(filetype, '.Fv', re.IGNORECASE):
+        elif filetype == '.fv':
             ROOT_TYPE = ROOT_FV_TREE
-        elif re.search(filetype, '.ffs', re.IGNORECASE):
+        elif filetype == '.ffs':
             ROOT_TYPE = ROOT_FFS_TREE
-        elif re.search(filetype, '.sec', re.IGNORECASE):
+        elif filetype == '.sec':
             ROOT_TYPE = ROOT_SECTION_TREE
         else:
             ROOT_TYPE = ROOT_TREE
-        if len(ParaList) == 2:
-            ParserFile(ParaList[0], ParaList[1], ROOT_TYPE)
+        ParserFile(inputfile, outputfile, ROOT_TYPE)
+
+    def Delete(self, inputfile, TargetFfs_name, outputfile, Fv_name=None):
+        if Fv_name:
+            DeleteFfs(inputfile, self.CheckFfsName(TargetFfs_name), outputfile, uuid.UUID(Fv_name))
         else:
-            ParserFile(ParaList[0], None, ROOT_TYPE)
+            DeleteFfs(inputfile, self.CheckFfsName(TargetFfs_name, outputfile))
 
-    def Delete(self, ParaList):
-        # DeleteFfs(inputfile, TargetFfs_name, outputfile, Fv_name=None)
-        if len(ParaList) == 4:
-            DeleteFfs(ParaList[0], self.CheckFfsName(ParaList[1]), ParaList[2], uuid.UUID(ParaList[3]))
+    def Extract(self, inputfile, Ffs_name, outputfile):
+        ExtractFfs(inputfile, self.CheckFfsName(Ffs_name), outputfile)
+
+    def AddNew(self, inputfile, Fv_name, newffsfile, outputfile):
+        AddNewFfs(inputfile, self.CheckFfsName(Fv_name), newffsfile, outputfile)
+
+    def Replace(self,inputfile, Ffs_name, newffsfile, outputfile, Fv_name=None):
+        if Fv_name:
+            ReplaceFfs(inputfile, self.CheckFfsName(Ffs_name, newffsfile, outputfile, uuid.UUID(Fv_name)))
         else:
-            DeleteFfs(ParaList[0], self.CheckFfsName(ParaList[1]), ParaList[2])
+            ReplaceFfs(inputfile, self.CheckFfsName(Ffs_name, newffsfile, outputfile))
 
-    def Extract(self, ParaList):
-        # ExtractFfs(inputfile, Ffs_name, outputfile)
-        ExtractFfs(ParaList[0], self.CheckFfsName(ParaList[1]), ParaList[2])
-
-    def Add(self, ParaList):
-        # AddNewFfs(inputfile, Fv_name, newffsfile, outputfile)
-        AddNewFfs(ParaList[0], self.CheckFfsName(ParaList[1]), ParaList[2], ParaList[3])
-
-    def Replace(self, ParaList):
-        # ReplaceFfs(inputfile, Ffs_name, newffsfile, outputfile, Fv_name=None)
-        if len(ParaList) == 5:
-            ReplaceFfs(ParaList[0], self.CheckFfsName(ParaList[1]), ParaList[2], ParaList[3], uuid.UUID(ParaList[4]))
-        else:
-            ReplaceFfs(ParaList[0], self.CheckFfsName(ParaList[1]), ParaList[2], ParaList[3])
 
 def main():
-    args = parser.parse_args()
-    status = 0
-
-    logger = logging.getLogger('FMMT')
-    logger.setLevel(logging.CRITICAL)
-
-    lh = logging.StreamHandler(sys.stdout)
-    lf = logging.Formatter("%(levelname)-8s: %(message)s")
-    lh.setFormatter(lf)
-    logger.addHandler(lh)
+    args=parser.parse_args()
+    status=0
 
     try:
-        fmmt = FMMT()
+        fmmt=FMMT()
         if args.View:
-            fmmt.View(args.View)
+            fmmt.View(args.View[0])
         if args.Delete:
-            fmmt.Delete(args.Delete)
+            fmmt.Delete(args.Delete[0],args.Delete[1],args.Delete[2],args.Delete[3])
         if args.Extract:
-            fmmt.Extract(args.Extract)
+            fmmt.Extract(args.Extract[0],args.Extract[1],args.Extract[2])
         if args.Add:
-            fmmt.Add(args.Add)
+            fmmt.Add(args.Add[0],args.Add[1],args.Add[2],args.Add[3])
         if args.Replace:
-            fmmt.Replace(args.Replace)
+            fmmt.Replace(args.Replace[0],args.Replace[1],args.Replace[2],args.Replace[3])
         # TODO:
         '''Do the main work'''
     except Exception as e:

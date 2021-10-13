@@ -1,7 +1,13 @@
+## @file
+# This file is used to define the BIOS Tree Node.
+#
+# Copyright (c) 2021-, Intel Corporation. All rights reserved.<BR>
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+##
 from PI.FvHeader import *
 from PI.FfsFileHeader import *
 from PI.SectionHeader import *
-from PI.ExtendCType import *
+from PI.Common import *
 import uuid
 
 SectionHeaderType = {

@@ -1,6 +1,12 @@
+## @file
+# This file is used to define the Section Header C Struct.
+#
+# Copyright (c) 2021-, Intel Corporation. All rights reserved.<BR>
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+##
 from struct import *
 from ctypes import *
-from PI.ExtendCType import *
+from PI.Common import *
 
 EFI_COMMON_SECTION_HEADER_LEN = 4
 EFI_COMMON_SECTION_HEADER2_LEN = 8
