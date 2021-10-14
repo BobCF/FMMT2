@@ -4,6 +4,7 @@
 # Copyright (c) 2021-, Intel Corporation. All rights reserved.<BR>
 # SPDX-License-Identifier: BSD-2-Clause-Patent
 ##
+import collections
 from PI.Common import *
 
 ROOT_TREE = 'ROOT'
@@ -118,3 +119,46 @@ class BIOSTREE:
         space += "  "
         for item in self.Child:
             item.parserTree(TreeInfo, space)
+
+    def ExportTree(self,TreeInfo=None):
+        if TreeInfo is None:
+            TreeInfo =collections.OrderedDict()
+
+        if self.type == ROOT_TREE or self.type == ROOT_FV_TREE or self.type == ROOT_FFS_TREE or self.type == ROOT_SECTION_TREE:
+            key = str(self.key)
+            TreeInfo[self.key] = collections.OrderedDict()
+            TreeInfo[self.key]["Name"] = key
+            TreeInfo[self.key]["Type"] = self.type
+            TreeInfo[self.key]["FilesNum"] = len(self.Child)
+        elif self.type == FFS_TREE:
+            key = str(self.Data.Name)
+            TreeInfo[key] = collections.OrderedDict()
+            TreeInfo[key]["Name"] = key
+            TreeInfo[key]["UiName"] = '{}'.format(self.Data.UiName)
+            TreeInfo[key]["Version"] = '{}'.format(self.Data.Version)
+            TreeInfo[key]["Type"] = self.type
+            TreeInfo[key]["Size"] = hex(self.Data.Size)
+            TreeInfo[key]["Offset"] = hex(self.Data.HOffset)
+            TreeInfo[key]["FilesNum"] = len(self.Child)
+        elif self.type == SECTION_TREE and self.Data.Type == 0x02:
+            key = str(self.Data.Name)
+            TreeInfo[key] = collections.OrderedDict()
+            TreeInfo[key]["Name"] = key
+            TreeInfo[key]["Type"] = self.type
+            TreeInfo[key]["Size"] = hex(len(self.Data.OriData) + self.Data.HeaderLength)
+            TreeInfo[key]["DecompressedSize"] = hex(self.Data.Size)
+            TreeInfo[key]["Offset"] = hex(self.Data.HOffset)
+            TreeInfo[key]["FilesNum"] = len(self.Child)
+        elif self is not None:
+            key = str(self.Data.Name)
+            TreeInfo[key] = collections.OrderedDict()
+            TreeInfo[key]["Name"] = key
+            TreeInfo[key]["Type"] = self.type
+            TreeInfo[key]["Size"] = hex(self.Data.Size)
+            TreeInfo[key]["Offset"] = hex(self.Data.HOffset)
+            TreeInfo[key]["FilesNum"] = len(self.Child)
+
+        for item in self.Child:
+            TreeInfo[key].setdefault('Files',[]).append( item.ExportTree())
+
+        return TreeInfo
