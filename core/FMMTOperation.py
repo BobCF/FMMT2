@@ -6,6 +6,7 @@
 ##
 from core.FMMTParser import *
 from core.FvHandler import *
+from utils.FvLayoutPrint import *
 
 global Fv_count
 Fv_count = 0
@@ -29,8 +30,7 @@ def ParserFile(inputfile, outputfile, ROOT_TYPE):
     # 2. DataTree Create
     FmmtParser.ParserFromRoot(FmmtParser.WholeFvTree, whole_data)
     # 3. Log Output
-    FmmtParser.WholeFvTree.parserTree(FmmtParser.BinaryInfo)
-    SaveTreeInfo(FmmtParser.BinaryInfo, "Parser_{}.log".format(os.path.basename(inputfile)))
+    GetFormatter('json').dump(FmmtParser.WholeFvTree.ExportTree(),"Parser_{}.log".format(os.path.basename(inputfile)))
     # 4. Data Encapsultion
     if outputfile:
         FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)
