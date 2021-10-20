@@ -5,26 +5,26 @@
 # SPDX-License-Identifier: BSD-2-Clause-Patent
 ##
 
-def GetFormatter(layout_format):
-    if layout_format == 'json':
+def GetFormatter(layout_format: str):
+    if layout_format == '.json':
         return JsonFormatter()
-    elif layout_format == 'yaml':
+    elif layout_format == '.yaml':
         return YamlFormatter()
-    elif layout_format == "html":
+    elif layout_format == ".html":
         return HtmlFormatter()
     else:
         return TxtFormatter()
 
 class Formatter(object):
-    def dump(self, layoutdict, outputfile = None):
+    def dump(self, layoutdict, layoutlist, outputfile: str=None) -> None:
         raise NotImplemented
 
 class JsonFormatter(Formatter):
-    def dump(self,layoutdict, outputfile = None):
+    def dump(self,layoutdict: dict, layoutlist: list, outputfile: str=None) -> None:
         try:
             import json
         except:
-            TxtFormatter().dump(layoutdict,outputfile)
+            TxtFormatter().dump(layoutdict, layoutlist, outputfile)
             return
         print(outputfile)
         if outputfile:
@@ -34,13 +34,21 @@ class JsonFormatter(Formatter):
             print(json.dumps(layoutdict,indent=2))
 
 class TxtFormatter(Formatter):
-    def dump(self,layoutdict, outputfile=None):
-        pass
+    def LogPrint(self,layoutlist: list) -> None:
+        for item in layoutlist:
+            print(item)
+        print('\n')
+
+    def dump(self,layoutdict: dict, layoutlist: list, outputfile: str=None) -> None:
+        print(outputfile)
+        with open(outputfile, "w") as f:
+            for item in layoutlist:
+                f.writelines(item + '\n')
 
 class YamlFormatter(Formatter):
-    def dump(self,layoutdict, outputfile = None):
-        TxtFormatter().dump(layoutdict,outputfile)
+    def dump(self,layoutdict, layoutlist, outputfile = None):
+        TxtFormatter().dump(layoutdict, layoutlist, outputfile)
 
 class HtmlFormatter(Formatter):
-    def dump(self,layoutdict, outputfile = None):
-        TxtFormatter().dump(layoutdict,outputfile)
+    def dump(self,layoutdict, layoutlist, outputfile = None):
+        TxtFormatter().dump(layoutdict, layoutlist, outputfile)

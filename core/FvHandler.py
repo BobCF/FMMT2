@@ -12,7 +12,7 @@ from PI.Common import *
 
 EFI_FVB2_ERASE_POLARITY = 0x00000800
 
-def ChangeSize(TargetTree, size_delta = 0):
+def ChangeSize(TargetTree, size_delta: int=0) -> None:
     if type(TargetTree.Data.Header) == type(EFI_FFS_FILE_HEADER2()) or type(TargetTree.Data.Header) == type(EFI_COMMON_SECTION_HEADER2()):
         TargetTree.Data.Size -= size_delta
         TargetTree.Data.Header.ExtendedSize -= size_delta
@@ -28,7 +28,7 @@ def ChangeSize(TargetTree, size_delta = 0):
         TargetTree.Data.Header.Size[1] = TargetTree.Data.Size % (16**4) //(16**2)
         TargetTree.Data.Header.Size[2] = TargetTree.Data.Size // (16**4)
 
-def ModifyFfsType(TargetFfs):
+def ModifyFfsType(TargetFfs) -> None:
     if type(TargetFfs.Data.Header) == type(EFI_FFS_FILE_HEADER()) and (TargetFfs.Data.HeaderLength + TargetFfs.Data.Size) > 0xFFFFFF:
         ExtendSize = TargetFfs.Data.Header.FFS_FILE_SIZE + 8
         New_Header = EFI_FFS_FILE_HEADER2()
@@ -71,14 +71,14 @@ def ModifyFfsType(TargetFfs):
             TarParent = TarParent.Parent
 
 class FvHandler:
-    def __init__(self, NewFfs, TargetFfs):
+    def __init__(self, NewFfs, TargetFfs) -> None:
         self.NewFfs = NewFfs
         self.TargetFfs = TargetFfs
         self.Status = False
         self.Remain_New_Free_Space = 0
 
     ## Use for Compress the Section Data
-    def CompressData(self, TargetTree):
+    def CompressData(self, TargetTree) -> None:
         TreePath = TargetTree.GetTreePath()
         pos = len(TreePath)
         self.Status = True
@@ -93,7 +93,7 @@ class FvHandler:
                         self.CompressSectionData(TreePath[pos-1], None)
             pos -= 1
 
-    def CompressSectionData(self, TargetTree, pos, GuidTool=None):
+    def CompressSectionData(self, TargetTree, pos: int, GuidTool=None) -> None:
         NewData = b''
         temp_save_child = TargetTree.Child
         if TargetTree.Data:
@@ -175,7 +175,7 @@ class FvHandler:
                 self.ModifyTest(TargetTree, self.Remain_New_Free_Space)
                 self.Status = False
 
-    def ModifyFvExtData(self, TreeNode):
+    def ModifyFvExtData(self, TreeNode) -> None:
         FvExtData = b''
         if TreeNode.Data.Header.ExtHeaderOffset:
             FvExtHeader = struct2stream(TreeNode.Data.ExtHeader)
@@ -188,7 +188,7 @@ class FvHandler:
             InfoNode.Data.Data = FvExtData + InfoNode.Data.Data[TreeNode.Data.ExtHeader.ExtHeaderSize:]
             InfoNode.Data.ModCheckSum()
 
-    def ModifyTest(self, ParTree, Needed_Space):
+    def ModifyTest(self, ParTree, Needed_Space: int) -> None:
         if Needed_Space > 0:
             if ParTree.type == FV_TREE or ParTree.type == SEC_FV_TREE:
                 ParTree.Data.Data = b''
@@ -283,7 +283,7 @@ class FvHandler:
         else:
             self.Status = True
 
-    def ReplaceFfs(self):
+    def ReplaceFfs(self) -> bool:
         TargetFv = self.TargetFfs.Parent
         # If the Fv Header Attributes is EFI_FVB2_ERASE_POLARITY, Child Ffs Header State need be reversed.
         if TargetFv.Data.Header.Attributes & EFI_FVB2_ERASE_POLARITY:
@@ -375,7 +375,7 @@ class FvHandler:
             TargetFv.Data.ModCheckSum()
         return self.Status
 
-    def AddFfs(self):
+    def AddFfs(self) -> bool:
         # NewFfs parsing will not calculate the PadSize, thus recalculate.
         self.NewFfs.Data.PadData = b'\xff' * GetPadSize(self.NewFfs.Data.Size, 8)
         if self.TargetFfs.type == FFS_FREE_SPACE:
@@ -475,7 +475,7 @@ class FvHandler:
                 self.ModifyTest(TargetFv.Parent, TargetLen)
         return self.Status
 
-    def DeleteFfs(self):
+    def DeleteFfs(self) -> bool:
         Delete_Ffs = self.TargetFfs
         Delete_Fv = Delete_Ffs.Parent
         Add_Free_Space = Delete_Ffs.Data.Size + len(Delete_Ffs.Data.PadData)
@@ -488,8 +488,10 @@ class FvHandler:
                 Delete_Fv.Child[-1].Data.Data = New_Free_Space * b'\xff'
                 Delete_Fv.Data.Free_Space = New_Free_Space
             else:
+                Used_Size = Delete_Fv.Data.Size - Delete_Fv.Data.Free_Space - Add_Free_Space
                 Delete_Fv.Child[-1].Data.Data += Add_Free_Space * b'\xff'
                 Delete_Fv.Data.Free_Space += Add_Free_Space
+                New_Free_Space = Delete_Fv.Data.Free_Space + Add_Free_Space
         else:
             if Delete_Fv.type == SEC_FV_TREE:
                 Used_Size = Delete_Fv.Data.Size - Add_Free_Space
@@ -497,6 +499,9 @@ class FvHandler:
                 New_Free_Space = BlockSize - Used_Size % BlockSize
                 self.Remain_New_Free_Space += Add_Free_Space - New_Free_Space
                 Add_Free_Space = New_Free_Space
+            else:
+                Used_Size = Delete_Fv.Data.Size - Add_Free_Space
+                New_Free_Space = Add_Free_Space
             New_Free_Space_Info = FfsNode(Add_Free_Space * b'\xff')
             New_Free_Space_Info.Data = Add_Free_Space * b'\xff'
             New_Ffs_Tree = BIOSTREE(New_Free_Space_Info.Name)

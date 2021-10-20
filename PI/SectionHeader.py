@@ -19,10 +19,10 @@ class EFI_COMMON_SECTION_HEADER(Structure):
     ]
 
     @property
-    def SECTION_SIZE(self):
+    def SECTION_SIZE(self) -> int:
         return self.Size[0] | self.Size[1] << 8 | self.Size[2] << 16
     
-    def Common_Header_Size(self):
+    def Common_Header_Size(self) -> int:
         return 4
 
 class EFI_COMMON_SECTION_HEADER2(Structure):
@@ -34,10 +34,10 @@ class EFI_COMMON_SECTION_HEADER2(Structure):
     ]
 
     @property
-    def SECTION_SIZE(self):
+    def SECTION_SIZE(self) -> int:
         return self.ExtendedSize
 
-    def Common_Header_Size(self):
+    def Common_Header_Size(self) -> int:
         return 8
 
 class EFI_COMPRESSION_SECTION(Structure):
@@ -47,7 +47,7 @@ class EFI_COMPRESSION_SECTION(Structure):
         ('CompressionType',          c_uint8),
     ]
 
-    def ExtHeaderSize(self):
+    def ExtHeaderSize(self) -> int:
         return 5
 
 class EFI_FREEFORM_SUBTYPE_GUID_SECTION(Structure):
@@ -56,7 +56,7 @@ class EFI_FREEFORM_SUBTYPE_GUID_SECTION(Structure):
         ('SubTypeGuid',              GUID),
     ]
 
-    def ExtHeaderSize(self):
+    def ExtHeaderSize(self) -> int:
         return 16
 
 class EFI_GUID_DEFINED_SECTION(Structure):
@@ -67,20 +67,20 @@ class EFI_GUID_DEFINED_SECTION(Structure):
         ('Attributes',               c_uint16),
     ]
 
-    def ExtHeaderSize(self):
+    def ExtHeaderSize(self) -> int:
         return 20
 
-def Get_USER_INTERFACE_Header(nums):
+def Get_USER_INTERFACE_Header(nums: int):
     class EFI_SECTION_USER_INTERFACE(Structure):
         _pack_ = 1
         _fields_ = [
             ('FileNameString',       ARRAY(c_uint16, nums)),
         ]
 
-        def ExtHeaderSize(self):
+        def ExtHeaderSize(self) -> int:
             return 2 * nums
 
-        def GetUiString(self):
+        def GetUiString(self) -> str:
             UiString = ''
             for i in range(nums):
                 if self.FileNameString[i]:
@@ -89,7 +89,7 @@ def Get_USER_INTERFACE_Header(nums):
 
     return EFI_SECTION_USER_INTERFACE
 
-def Get_VERSION_Header(nums):
+def Get_VERSION_Header(nums: int):
     class EFI_SECTION_VERSION(Structure):
         _pack_ = 1
         _fields_ = [
@@ -97,10 +97,10 @@ def Get_VERSION_Header(nums):
             ('VersionString',        ARRAY(c_uint16, nums)),
         ]
 
-        def ExtHeaderSize(self):
+        def ExtHeaderSize(self) -> int:
             return 2 * (nums+1)
 
-        def GetVersionString(self):
+        def GetVersionString(self) -> str:
             VersionString = ''
             for i in range(nums):
                 if self.VersionString[i]:

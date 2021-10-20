@@ -30,17 +30,18 @@ SectionHeaderType = {
 HeaderType = [0x01, 0x02, 0x14, 0x15, 0x18]
 
 class BinaryNode:
-    def __init__(self, name):
+    def __init__(self, name: str) -> None:
         self.Size = 0
         self.Name = "BINARY" + str(name)
         self.HOffset = 0
         self.Data = b''
 
 class FvNode:
-    def __init__(self, name, buffer: bytes):
+    def __init__(self, name, buffer: bytes) -> None:
         self.Header = EFI_FIRMWARE_VOLUME_HEADER.from_buffer_copy(buffer)
         Map_num = (self.Header.HeaderLength - 56)//8
         self.Header = Refine_FV_Header(Map_num).from_buffer_copy(buffer)
+        self.FvId = "FV" + str(name)
         self.Name = "FV" + str(name)
         if self.Header.ExtHeaderOffset:
             self.ExtHeader = EFI_FIRMWARE_VOLUME_EXT_HEADER.from_buffer_copy(buffer[self.Header.ExtHeaderOffset:])
@@ -77,7 +78,7 @@ class FvNode:
         self.Free_Space = 0
         self.ModCheckSum()
 
-    def ModCheckSum(self):
+    def ModCheckSum(self) -> None:
         # Fv Header Sums to 0.
         Header = struct2stream(self.Header)[::-1]
         Size = self.HeaderLength // 2
@@ -87,19 +88,19 @@ class FvNode:
         if Sum & 0xffff:
             self.Header.Checksum = int(hex(0x10000 - int(hex(Sum - self.Header.Checksum)[-4:], 16)), 16)
 
-    def ModFvExt(self):
+    def ModFvExt(self) -> None:
         # If used space changes and self.ExtEntry.UsedSize exists, self.ExtEntry.UsedSize need to be changed.
         if self.Header.ExtHeaderOffset and self.ExtEntryExist and self.ExtTypeExist and self.ExtEntry.Hdr.ExtEntryType == 0x03:
             self.ExtEntry.UsedSize = self.Header.FvLength - self.Free_Space
 
-    def ModFvSize(self):
+    def ModFvSize(self) -> None:
         # If Fv Size changed, self.Header.FvLength and self.Header.BlockMap[i].NumBlocks need to be changed.
         BlockMapNum = len(self.Header.BlockMap)
         for i in range(BlockMapNum):
             if self.Header.BlockMap[i].Length:
                 self.Header.BlockMap[i].NumBlocks = self.Header.FvLength // self.Header.BlockMap[i].Length
 
-    def ModExtHeaderData(self):
+    def ModExtHeaderData(self) -> None:
         if self.Header.ExtHeaderOffset:
             ExtHeaderData = struct2stream(self.ExtHeader)
             ExtHeaderDataOffset = self.Header.ExtHeaderOffset - self.HeaderLength
@@ -110,7 +111,7 @@ class FvNode:
             self.Data = self.Data[:ExtHeaderEntryDataOffset] + ExtHeaderEntryData + self.Data[ExtHeaderEntryDataOffset+len(ExtHeaderEntryData):]
 
 class FfsNode:
-    def __init__(self, buffer: bytes):
+    def __init__(self, buffer: bytes) -> None:
         self.Header = EFI_FFS_FILE_HEADER.from_buffer_copy(buffer)
         # self.Attributes = unpack("<B", buffer[21:22])[0]
         if self.Header.Size != 0 and self.Header.Attributes == 0x01:
@@ -128,7 +129,7 @@ class FfsNode:
         self.Data = b''
         self.PadData = b''
 
-    def ModCheckSum(self):
+    def ModCheckSum(self) -> None:
         HeaderData = struct2stream(self.Header)
         HeaderSum = 0
         for item in HeaderData:
@@ -140,7 +141,7 @@ class FfsNode:
             self.Header.IntegrityCheck.Checksum.Header = int(hex(Header)[-2:], 16)
 
 class SectionNode:
-    def __init__(self, buffer: bytes):
+    def __init__(self, buffer: bytes) -> None:
         if buffer[0:3] != b'\xff\xff\xff':
             self.Header = EFI_COMMON_SECTION_HEADER.from_buffer_copy(buffer)
         else:
@@ -167,7 +168,7 @@ class SectionNode:
         self.OriHeader = b''
         self.PadData = b''
 
-    def GetExtHeader(self, Type, buffer:bytes, nums = 0):
+    def GetExtHeader(self, Type: int, buffer: bytes, nums: int=0) -> None:
         if Type == 0x01:
             return EFI_COMPRESSION_SECTION.from_buffer_copy(buffer)
         elif Type == 0x02:
@@ -180,7 +181,7 @@ class SectionNode:
             return EFI_FREEFORM_SUBTYPE_GUID_SECTION.from_buffer_copy(buffer)
 
 class FreeSpaceNode:
-    def __init__(self, buffer: bytes):
+    def __init__(self, buffer: bytes) -> None:
         self.Name = 'Free_Space'
         self.Data = buffer
         self.Size = len(buffer)

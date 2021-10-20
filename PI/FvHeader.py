@@ -74,7 +74,7 @@ class EFI_FIRMWARE_VOLUME_EXT_ENTRY_OEM_TYPE(Structure):
         ('Types',                ARRAY(GUID, 1))
         ]
 
-def Refine_FV_EXT_ENTRY_OEM_TYPE_Header(nums):
+def Refine_FV_EXT_ENTRY_OEM_TYPE_Header(nums: int) -> EFI_FIRMWARE_VOLUME_EXT_ENTRY_OEM_TYPE:
     class EFI_FIRMWARE_VOLUME_EXT_ENTRY_OEM_TYPE(Structure):
         _fields_ = [
             ('Hdr',                  EFI_FIRMWARE_VOLUME_EXT_ENTRY),
@@ -96,7 +96,7 @@ class EFI_FIRMWARE_VOLUME_EXT_ENTRY_GUID_TYPE(Structure):
         ('Data',                 ARRAY(c_uint8, 1))
         ]
 
-def Refine_FV_EXT_ENTRY_GUID_TYPE_Header(nums):
+def Refine_FV_EXT_ENTRY_GUID_TYPE_Header(nums: int) -> EFI_FIRMWARE_VOLUME_EXT_ENTRY_GUID_TYPE:
     class EFI_FIRMWARE_VOLUME_EXT_ENTRY_GUID_TYPE(Structure):
         _fields_ = [
             ('Hdr',                  EFI_FIRMWARE_VOLUME_EXT_ENTRY),

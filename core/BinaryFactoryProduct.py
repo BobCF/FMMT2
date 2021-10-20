@@ -36,7 +36,7 @@ class BinaryFactory():
 
 class BinaryProduct():
     ## Use GuidTool to decompress data.
-    def DeCompressData(self, GuidTool, Section_Data):
+    def DeCompressData(self, GuidTool, Section_Data: bytes) -> bytes:
         ParPath = os.path.abspath(os.path.dirname(os.path.abspath(__file__))+os.path.sep+"..")
         ToolPath = os.path.join(ParPath, r'FMMTConfig.ini')
         guidtool = GUIDTools(ToolPath).__getitem__(struct2stream(GuidTool))
@@ -72,7 +72,7 @@ class FdFactory(BinaryFactory):
 
 class SectionProduct(BinaryProduct):
     ## Decompress the compressed section.
-    def ParserData(self, Section_Tree, whole_Data, Rel_Whole_Offset = 0):
+    def ParserData(self, Section_Tree, whole_Data: bytes, Rel_Whole_Offset: int=0) -> None:
         if Section_Tree.Data.Type == 0x01:
             Section_Tree.Data.OriData = Section_Tree.Data.Data
             self.ParserFfs(Section_Tree, b'')
@@ -88,6 +88,7 @@ class SectionProduct(BinaryProduct):
             self.ParserFfs(Section_Tree, b'')
         # SEC_FV Section
         elif Section_Tree.Data.Type == 0x17:
+            global Fv_count
             Sec_Fv_Info = FvNode(Fv_count, Section_Tree.Data.Data)
             Sec_Fv_Tree = BIOSTREE('FV'+ str(Fv_count))
             Sec_Fv_Tree.type = SEC_FV_TREE
@@ -96,8 +97,9 @@ class SectionProduct(BinaryProduct):
             Sec_Fv_Tree.Data.DOffset = Sec_Fv_Tree.Data.HOffset + Sec_Fv_Tree.Data.Header.HeaderLength
             Sec_Fv_Tree.Data.Data = Section_Tree.Data.Data[Sec_Fv_Tree.Data.Header.HeaderLength:]
             Section_Tree.insertChild(Sec_Fv_Tree)
+            Fv_count += 1
 
-    def ParserFfs(self, ParTree, Whole_Data, Rel_Whole_Offset = 0):
+    def ParserFfs(self, ParTree, Whole_Data: bytes, Rel_Whole_Offset: int=0) -> None:
         Rel_Offset = 0
         Section_Offset = 0
         # Get the Data from parent tree, if do not have the tree then get it from the whole_data.
@@ -138,7 +140,7 @@ class SectionProduct(BinaryProduct):
 
 class FfsProduct(BinaryProduct):
     # ParserFFs / GetSection
-    def ParserData(self, ParTree, Whole_Data, Rel_Whole_Offset = 0):
+    def ParserData(self, ParTree, Whole_Data: bytes, Rel_Whole_Offset: int=0) -> None:
         Rel_Offset = 0
         Section_Offset = 0
         # Get the Data from parent tree, if do not have the tree then get it from the whole_data.
@@ -180,7 +182,7 @@ class FfsProduct(BinaryProduct):
 
 class FvProduct(BinaryProduct):
     ##  ParserFv / GetFfs
-    def ParserData(self, ParTree, Whole_Data, Rel_Whole_Offset = 0):
+    def ParserData(self, ParTree, Whole_Data: bytes, Rel_Whole_Offset: int=0) -> None:
         Ffs_Offset = 0
         Rel_Offset = 0
         # Get the Data from parent tree, if do not have the tree then get it from the whole_data.
@@ -235,7 +237,7 @@ class FdProduct(BinaryProduct):
     type = [ROOT_FV_TREE, ROOT_TREE]
 
     ## Create DataTree with first level /fv Info, then parser each Fv.
-    def ParserData(self, WholeFvTree, whole_data=b'', offset = 0):
+    def ParserData(self, WholeFvTree, whole_data: bytes=b'', offset: int=0) -> None:
         # Get all Fv image in Fd with offset and length
         Fd_Struct = self.GetFvFromFd(whole_data)
         data_size = len(whole_data)
@@ -289,9 +291,10 @@ class FdProduct(BinaryProduct):
             Binary_node.Data.Size = len(Binary_node.Data.Data)
             Binary_node.Data.HOffset = Fd_Struct[-1][1]+Fd_Struct[-1][2][0] + offset
             WholeFvTree.insertChild(Binary_node)
+            Binary_count += 1
 
     ## Get the first level Fv from Fd file.
-    def GetFvFromFd(self, whole_data=b''):
+    def GetFvFromFd(self, whole_data: bytes=b'') -> list:
         Fd_Struct = []
         data_size = len(whole_data)
         cur_index = 0
@@ -354,15 +357,15 @@ class ParserEntry():
         ROOT_TREE: FdFactory,
     }
 
-    def GetTargetFactory(self, Tree_type):
+    def GetTargetFactory(self, Tree_type: str) -> BinaryFactory:
         if Tree_type in self.FactoryTable:
             return self.FactoryTable[Tree_type]
 
-    def Generate_Product(self, TargetFactory, Tree, Data, Offset):
+    def Generate_Product(self, TargetFactory: BinaryFactory, Tree, Data: bytes, Offset: int) -> None:
         New_Product = TargetFactory.Create_Product()
         New_Product.ParserData(Tree, Data, Offset)
 
-    def DataParser(self, Tree, Data, Offset):
+    def DataParser(self, Tree, Data: bytes, Offset: int) -> None:
         TargetFactory = self.GetTargetFactory(Tree.type)
         if TargetFactory:
             self.Generate_Product(TargetFactory, Tree, Data, Offset)

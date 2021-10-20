@@ -35,14 +35,14 @@ class GUID(Structure):
         ('Guid4',            ARRAY(c_uint8, 8)),
     ]
 
-    def from_list(self, listformat):
+    def from_list(self, listformat: list) -> None:
         self.Guid1 = listformat[0]
         self.Guid2 = listformat[1]
         self.Guid3 = listformat[2]
         for i in range(8):
             self.Guid4[i] = listformat[i+3]
 
-    def __cmp__(self, otherguid):
+    def __cmp__(self, otherguid) -> bool:
         if not isinstance(otherguid, GUID):
             return 'Input is not the GUID instance!'
         rt = False
@@ -52,7 +52,7 @@ class GUID(Structure):
                 rt = rt & (self.Guid4[i] == otherguid.Guid4[i])
         return rt
 
-def ModifyGuidFormat(target_guid):
+def ModifyGuidFormat(target_guid: str) -> GUID:
     target_guid = target_guid.replace('-', '')
     target_list = []
     start = [0,8,12,16,18,20,22,24,26,28,30]
@@ -67,14 +67,14 @@ def ModifyGuidFormat(target_guid):
 
 
 # Get data from ctypes to bytes.
-def struct2stream(s):
+def struct2stream(s) -> bytes:
     length = sizeof(s)
     p = cast(pointer(s), POINTER(c_char * length))
     return p.contents.raw
 
 
 
-def GetPadSize(Size, alignment):
+def GetPadSize(Size: int, alignment: int) -> int:
     if Size % alignment == 0:
         return 0
     Pad_Size = alignment - Size % alignment

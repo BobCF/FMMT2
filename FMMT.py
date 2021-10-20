@@ -28,22 +28,24 @@ parser.add_argument("-a", "--Add", dest="Add", nargs='+',
                     help="Add a Ffs into a FV:'-a inputfile TargetFvName newffsfile outputfile'")
 parser.add_argument("-r", "--Replace", dest="Replace", nargs='+',
                     help="Replace a Ffs in a FV: '-r inputfile TargetFfsName newffsfile outputfile'")
+parser.add_argument("-l", "--LogFile", dest="LogFile", nargs='+',
+                    help="Save Binary layout with a log file")
 
 def print_banner():
     print("")
 
 class FMMT():
-    def __init__(self):
+    def __init__(self) -> None:
         self.firmware_packet = {}
 
-    def CheckFfsName(self, FfsName):
+    def CheckFfsName(self, FfsName:str) -> str:
         try:
             return uuid.UUID(FfsName)
         except:
             return FfsName
 
-    def View(self, inputfile, outputfile=None):
-        # ParserFile(inputfile, outputfile, ROOT_TYPE)
+    def View(self, inputfile: str, logfile: str=None, outputfile: str=None) -> None:
+        # ParserFile(inputfile, ROOT_TYPE, logfile, outputfile)
         filetype = os.path.splitext(inputfile)[1].lower()
         if filetype == '.fd':
             ROOT_TYPE = ROOT_TREE
@@ -55,21 +57,21 @@ class FMMT():
             ROOT_TYPE = ROOT_SECTION_TREE
         else:
             ROOT_TYPE = ROOT_TREE
-        ParserFile(inputfile, outputfile, ROOT_TYPE)
+        ParserFile(inputfile, ROOT_TYPE, logfile, outputfile)
 
-    def Delete(self, inputfile, TargetFfs_name, outputfile, Fv_name=None):
+    def Delete(self, inputfile: str, TargetFfs_name: str, outputfile: str, Fv_name: str=None) -> None:
         if Fv_name:
             DeleteFfs(inputfile, self.CheckFfsName(TargetFfs_name), outputfile, uuid.UUID(Fv_name))
         else:
             DeleteFfs(inputfile, self.CheckFfsName(TargetFfs_name, outputfile))
 
-    def Extract(self, inputfile, Ffs_name, outputfile):
+    def Extract(self, inputfile: str, Ffs_name: str, outputfile: str) -> None:
         ExtractFfs(inputfile, self.CheckFfsName(Ffs_name), outputfile)
 
-    def AddNew(self, inputfile, Fv_name, newffsfile, outputfile):
+    def Add(self, inputfile: str, Fv_name: str, newffsfile: str, outputfile: str) -> None:
         AddNewFfs(inputfile, self.CheckFfsName(Fv_name), newffsfile, outputfile)
 
-    def Replace(self,inputfile, Ffs_name, newffsfile, outputfile, Fv_name=None):
+    def Replace(self,inputfile: str, Ffs_name: str, newffsfile: str, outputfile: str, Fv_name: str=None) -> None:
         if Fv_name:
             ReplaceFfs(inputfile, self.CheckFfsName(Ffs_name, newffsfile, outputfile, uuid.UUID(Fv_name)))
         else:
@@ -83,7 +85,10 @@ def main():
     try:
         fmmt=FMMT()
         if args.View:
-            fmmt.View(args.View[0])
+            if args.LogFile:
+                fmmt.View(args.View[0], args.LogFile[0])
+            else:
+                fmmt.View(args.View[0])
         if args.Delete:
             fmmt.Delete(args.Delete[0],args.Delete[1],args.Delete[2],args.Delete[3])
         if args.Extract:

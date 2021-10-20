@@ -11,18 +11,8 @@ from utils.FvLayoutPrint import *
 global Fv_count
 Fv_count = 0
 
-def SaveTreeInfo(TreeInfo, outputname, output_filetype='.txt'):
-    if not os.path.exists("Fmmt_output"):
-        os.makedirs("Fmmt_output")
-    try:
-        with open(os.path.join("Fmmt_output", outputname+output_filetype), "w") as f:
-            for item in TreeInfo:
-                f.writelines(item + '\n')
-    except:
-        print('Log saved in {}'.format(os.path.abspath(outputname)))
-
 # The ROOT_TYPE can be 'ROOT_TREE', 'ROOT_FV_TREE', 'ROOT_FFS_TREE', 'ROOT_SECTION_TREE'
-def ParserFile(inputfile, outputfile, ROOT_TYPE):
+def ParserFile(inputfile: str, ROOT_TYPE: str, logfile: bool=False, outputfile: str=None) -> None:
     # 1. Data Prepare
     with open(inputfile, "rb") as f:
         whole_data = f.read()
@@ -30,21 +20,24 @@ def ParserFile(inputfile, outputfile, ROOT_TYPE):
     # 2. DataTree Create
     FmmtParser.ParserFromRoot(FmmtParser.WholeFvTree, whole_data)
     # 3. Log Output
-    GetFormatter('json').dump(FmmtParser.WholeFvTree.ExportTree(),"Parser_{}.log".format(os.path.basename(inputfile)))
+    InfoDict = FmmtParser.WholeFvTree.ExportTree()
+    FmmtParser.WholeFvTree.parserTree(InfoDict, FmmtParser.BinaryInfo)
+    GetFormatter("").LogPrint(FmmtParser.BinaryInfo)
+    if logfile:
+        GetFormatter(os.path.splitext(logfile)[1]).dump(InfoDict, FmmtParser.BinaryInfo,"Parser_Log_{}{}".format(os.path.basename(inputfile),os.path.splitext(logfile)[1]))
     # 4. Data Encapsultion
     if outputfile:
         FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)
         with open(outputfile, "wb") as f:
             f.write(FmmtParser.FinalData)
 
-def DeleteFfs(inputfile, TargetFfs_name, outputfile, Fv_name=None):
+def DeleteFfs(inputfile: str, TargetFfs_name: str, outputfile: str, Fv_name: str=None) -> None:
     # 1. Data Prepare
     with open(inputfile, "rb") as f:
         whole_data = f.read()
     FmmtParser = FMMTParser(inputfile, ROOT_TREE)
     # 2. DataTree Create
     FmmtParser.ParserFromRoot(FmmtParser.WholeFvTree, whole_data)
-    FmmtParser.WholeFvTree.parserTree(FmmtParser.BinaryInfo)
     # 3. Data Modify
     FmmtParser.WholeFvTree.FindNode(TargetFfs_name, FmmtParser.WholeFvTree.Findlist)
     # Choose the Specfic DeleteFfs with Fv info
@@ -64,7 +57,7 @@ def DeleteFfs(inputfile, TargetFfs_name, outputfile, Fv_name=None):
         with open(outputfile, "wb") as f:
             f.write(FmmtParser.FinalData)
 
-def AddNewFfs(inputfile, Fv_name, newffsfile, outputfile):
+def AddNewFfs(inputfile: str, Fv_name: str, newffsfile: str, outputfile: str) -> None:
     # 1. Data Prepare
     with open(inputfile, "rb") as f:
         whole_data = f.read()
@@ -96,7 +89,7 @@ def AddNewFfs(inputfile, Fv_name, newffsfile, outputfile):
         with open(outputfile, "wb") as f:
             f.write(FmmtParser.FinalData)
 
-def ReplaceFfs(inputfile, Ffs_name, newffsfile, outputfile, Fv_name=None):
+def ReplaceFfs(inputfile: str, Ffs_name: str, newffsfile: str, outputfile: str, Fv_name: str=None) -> None:
     # 1. Data Prepare
     with open(inputfile, "rb") as f:
         whole_data = f.read()
@@ -128,7 +121,7 @@ def ReplaceFfs(inputfile, Ffs_name, newffsfile, outputfile, Fv_name=None):
         with open(outputfile, "wb") as f:
             f.write(FmmtParser.FinalData)
 
-def ExtractFfs(inputfile, Ffs_name, outputfile):
+def ExtractFfs(inputfile: str, Ffs_name: str, outputfile: str) -> None:
     with open(inputfile, "rb") as f:
         whole_data = f.read()
     FmmtParser = FMMTParser(inputfile, ROOT_TREE)

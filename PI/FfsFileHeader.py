@@ -38,11 +38,11 @@ class EFI_FFS_FILE_HEADER(Structure):
     ]
 
     @property
-    def FFS_FILE_SIZE(self):
+    def FFS_FILE_SIZE(self) -> int:
         return self.Size[0] | self.Size[1] << 8 | self.Size[2] << 16
 
     @property
-    def HeaderLength(self):
+    def HeaderLength(self) -> int:
         return 24
 
 class EFI_FFS_FILE_HEADER2(Structure):
@@ -58,9 +58,9 @@ class EFI_FFS_FILE_HEADER2(Structure):
     ]
 
     @property
-    def FFS_FILE_SIZE(self):
+    def FFS_FILE_SIZE(self) -> int:
         return self.ExtendedSize
 
     @property
-    def HeaderLength(self):
+    def HeaderLength(self) -> int:
         return 32

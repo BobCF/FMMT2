@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: BSD-2-Clause-Patent
 ##
 import collections
+from typing import OrderedDict
 from PI.Common import *
 
 ROOT_TREE = 'ROOT'
@@ -21,8 +22,13 @@ SECTION_TREE = 'SECTION'
 SEC_FV_TREE = 'SEC_FV_IMAGE'
 BINARY_DATA = 'BINARY'
 
+RootType = [ROOT_TREE, ROOT_FV_TREE, ROOT_FFS_TREE, ROOT_SECTION_TREE]
+FvType = [FV_TREE, SEC_FV_TREE]
+FfsType = FFS_TREE
+SecType = SECTION_TREE
+
 class BIOSTREE:
-    def __init__(self, NodeName):
+    def __init__(self, NodeName: str) -> None:
         self.key = NodeName
         self.type = None
         self.Data = None
@@ -32,13 +38,13 @@ class BIOSTREE:
         self.NextRel = None
         self.LastRel = None
  
-    def HasChild(self):
+    def HasChild(self) -> bool:
         if self.Child == []:
             return False
         else:
             return True
 
-    def isFinalChild(self):
+    def isFinalChild(self) -> bool:
         ParTree = self.Parent
         if ParTree:
             if ParTree.Child[-1] == self:
@@ -46,7 +52,7 @@ class BIOSTREE:
         return False
 
     # FvTree.insertChild()
-    def insertChild(self, newNode, pos=None):
+    def insertChild(self, newNode, pos: int=None) -> None:
         if len(self.Child) == 0:
             self.Child.append(newNode)
         else:
@@ -64,7 +70,7 @@ class BIOSTREE:
         newNode.Parent = self
 
     # lastNode.insertRel(newNode)
-    def insertRel(self, newNode):
+    def insertRel(self, newNode) -> None:
         if self.Parent:
             parentTree = self.Parent
             new_index = parentTree.Child.index(self) + 1
@@ -72,7 +78,7 @@ class BIOSTREE:
         self.NextRel = newNode
         newNode.LastRel = self
 
-    def deleteNode(self, deletekey):
+    def deleteNode(self, deletekey: str) -> None:
         FindStatus, DeleteTree = self.FindNode(deletekey)
         if FindStatus:
             parentTree = DeleteTree.Parent
@@ -93,7 +99,7 @@ class BIOSTREE:
             print('Could not find the target tree')
             return None
 
-    def FindNode(self, key, Findlist):
+    def FindNode(self, key: str, Findlist: list) -> None:
         if self.key == key or (self.Data and self.Data.Name == key) or (self.type == FFS_TREE and self.Data.UiName == key):
             Findlist.append(self)
         else:
@@ -107,20 +113,37 @@ class BIOSTREE:
             self = self.Parent
         return BiosTreePath
 
-    def parserTree(self, TreeInfo, space =""):
-        if self.type == ROOT_TREE or self.type == ROOT_FV_TREE or self.type == ROOT_FFS_TREE or self.type == ROOT_SECTION_TREE:
-            TreeInfo.append("Name:{}  Type:{}  FilesNum:{}".format(self.key, self.type, len(self.Child)))
-        elif self.type == FFS_TREE:
-            TreeInfo.append("{}Name:{}  UiName:{}  Version:{}  Type:{}  Size:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.Data.UiName, self.Data.Version, self.type, hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
-        elif self.type == SECTION_TREE and self.Data.Type == 0x02:
-            TreeInfo.append("{}Name:{}  Type:{}  Size:{}  DecompressedSize:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.type, hex(len(self.Data.OriData)+self.Data.HeaderLength), hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
-        elif self is not None:
-            TreeInfo.append("{}Name:{}  Type:{}  Size:{}  Offset:{}  FilesNum:{}".format(space, self.Data.Name, self.type, hex(self.Data.Size), hex(self.Data.HOffset), len(self.Child)))
-        space += "  "
-        for item in self.Child:
-            item.parserTree(TreeInfo, space)
+    def parserTree(self, TargetDict: dict=None, Info: list=None, space: int=0) -> None:
+        Key = list(TargetDict.keys())[0]
+        if TargetDict[Key]["Type"] in RootType:
+            Info.append("Image File: {}".format(Key))
+            Info.append("FilesNum: {}".format(TargetDict.get(Key).get('FilesNum')))
+            Info.append("\n")
+        elif TargetDict[Key]["Type"] in FvType:
+            space += 2
+            if TargetDict[Key]["Type"] == SEC_FV_TREE:
+                Info.append("{}Child FV named {} of {}".format(space*" ", Key, self.FvId))
+                space += 2
+            else:
+                Info.append("FvId: {}".format(Key))
+                self.FvId = Key
+            Info.append("{}FvNameGuid: {}".format(space*" ", TargetDict.get(Key).get('FvNameGuid')))
+            Info.append("{}Attributes: {}".format(space*" ", TargetDict.get(Key).get('Attributes')))
+            Info.append("{}Total Volume Size: {}".format(space*" ", TargetDict.get(Key).get('Size')))
+            Info.append("{}Free Volume Size: {}".format(space*" ", TargetDict.get(Key).get('FreeSize')))
+            Info.append("{}Volume Offset: {}".format(space*" ", TargetDict.get(Key).get('Offset')))
+            Info.append("{}FilesNum: {}".format(space*" ", TargetDict.get(Key).get('FilesNum')))
+        elif TargetDict[Key]["Type"] in FfsType:
+            space += 2
+            if TargetDict.get(Key).get('UiName') != "b''":
+                Info.append("{}File: {} / {}".format(space*" ", Key, TargetDict.get(Key).get('UiName')))
+            else:
+                Info.append("{}File: {}".format(space*" ", Key))
+        if "Files" in list(TargetDict[Key].keys()):
+            for item in TargetDict[Key]["Files"]:
+                self.parserTree(item, Info, space)
 
-    def ExportTree(self,TreeInfo=None):
+    def ExportTree(self,TreeInfo: dict=None) -> dict:
         if TreeInfo is None:
             TreeInfo =collections.OrderedDict()
 
@@ -130,6 +153,18 @@ class BIOSTREE:
             TreeInfo[self.key]["Name"] = key
             TreeInfo[self.key]["Type"] = self.type
             TreeInfo[self.key]["FilesNum"] = len(self.Child)
+        elif self.type == FV_TREE or  self.type == SEC_FV_TREE:
+            key = str(self.Data.FvId)
+            TreeInfo[key] = collections.OrderedDict()
+            TreeInfo[key]["Name"] = key
+            if self.Data.FvId != self.Data.Name:
+                TreeInfo[key]["FvNameGuid"] = str(self.Data.Name)
+            TreeInfo[key]["Type"] = self.type
+            TreeInfo[key]["Attributes"] = hex(self.Data.Header.Attributes)
+            TreeInfo[key]["Size"] = hex(self.Data.Header.FvLength)
+            TreeInfo[key]["FreeSize"] = hex(self.Data.Free_Space)
+            TreeInfo[key]["Offset"] = hex(self.Data.HOffset)
+            TreeInfo[key]["FilesNum"] = len(self.Child)
         elif self.type == FFS_TREE:
             key = str(self.Data.Name)
             TreeInfo[key] = collections.OrderedDict()

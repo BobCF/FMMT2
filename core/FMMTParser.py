@@ -11,14 +11,14 @@ from core.BiosTree import *
 from core.GuidTools import *
 
 class FMMTParser:
-    def __init__(self, name, TYPE):
+    def __init__(self, name: str, TYPE: str) -> None:
         self.WholeFvTree = BIOSTREE(name)
         self.WholeFvTree.type = TYPE
         self.FinalData = b''
         self.BinaryInfo = []
 
     ## Parser the nodes in WholeTree.
-    def ParserFromRoot(self, WholeFvTree=None, whole_data=b'', Reloffset = 0):
+    def ParserFromRoot(self, WholeFvTree=None, whole_data: bytes=b'', Reloffset: int=0) -> None:
         if WholeFvTree.type == ROOT_TREE or WholeFvTree.type == ROOT_FV_TREE:
             ParserEntry().DataParser(self.WholeFvTree, whole_data, Reloffset)
         else:
@@ -27,7 +27,7 @@ class FMMTParser:
             self.ParserFromRoot(Child, "")
 
     ## Encapuslation all the data in tree into self.FinalData
-    def Encapsulation(self, rootTree, CompressStatus):
+    def Encapsulation(self, rootTree, CompressStatus: bool) -> None:
         # If current node is Root node, skip it.
         if rootTree.type == ROOT_TREE or rootTree.type == ROOT_FV_TREE or rootTree.type == ROOT_FFS_TREE or rootTree.type == ROOT_SECTION_TREE:
             print('Start at Root !')

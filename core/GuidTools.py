@@ -15,16 +15,16 @@ from PI.Common import *
 from utils.FmmtLogger import FmmtLogger as logger
 import subprocess
 
-def ExecuteCommand(cmd):
+def ExecuteCommand(cmd: list) -> None:
     subprocess.run(cmd,stdout=subprocess.DEVNULL)
 
 class GUIDTool:
-    def __init__(self, guid, short_name, command):
+    def __init__(self, guid: str, short_name: str, command: str) -> None:
         self.guid: str = guid
         self.short_name: str = short_name
         self.command: str = command
 
-    def pack(self, buffer):
+    def pack(self, buffer: bytes) -> bytes:
         """
         compress file.
         """
@@ -57,7 +57,7 @@ class GUIDTool:
             return ""
 
 
-    def unpack(self, buffer):
+    def unpack(self, buffer: bytes) -> bytes:
         """
         buffer: remove common header
         uncompress file
@@ -100,14 +100,14 @@ class GUIDTools:
         struct2stream(ModifyGuidFormat("3d532050-5cda-4fd0-879e-0f7f630d5afb")): GUIDTool("3d532050-5cda-4fd0-879e-0f7f630d5afb", "BROTLI", "BrotliCompress"),
     }
 
-    def __init__(self, tooldef_file=None):
+    def __init__(self, tooldef_file: str=None) -> None:
         self.dir = os.path.dirname(__file__)
         self.tooldef_file = tooldef_file if tooldef_file else os.path.join(
             self.dir, "FMMTConfig.ini")
         self.tooldef = dict()
         self.load()
 
-    def VerifyTools(self):
+    def VerifyTools(self) -> None:
         """
         Verify Tools and Update Tools path.
         """
@@ -127,7 +127,7 @@ class GUIDTools:
                 else:
                     print("Tool Not found %s" % cmd)
 
-    def load(self):
+    def load(self) -> None:
         if os.path.exists(self.tooldef_file):
             with open(self.tooldef_file, "r") as fd:
                 config_data = fd.readlines()
@@ -145,7 +145,7 @@ class GUIDTools:
 
         self.VerifyTools()
 
-    def __getitem__(self, guid):
+    def __getitem__(self, guid) -> None:
         return self.tooldef.get(guid)
 
 
