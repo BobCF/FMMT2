@@ -12,7 +12,7 @@ global Fv_count
 Fv_count = 0
 
 # The ROOT_TYPE can be 'ROOT_TREE', 'ROOT_FV_TREE', 'ROOT_FFS_TREE', 'ROOT_SECTION_TREE'
-def ParserFile(inputfile: str, ROOT_TYPE: str, logfile: bool=False, outputfile: str=None) -> None:
+def ParserFile(inputfile: str, ROOT_TYPE: str, logfile: str=None, outputfile: str=None) -> None:
     # 1. Data Prepare
     with open(inputfile, "rb") as f:
         whole_data = f.read()
@@ -24,7 +24,7 @@ def ParserFile(inputfile: str, ROOT_TYPE: str, logfile: bool=False, outputfile: 
     FmmtParser.WholeFvTree.parserTree(InfoDict, FmmtParser.BinaryInfo)
     GetFormatter("").LogPrint(FmmtParser.BinaryInfo)
     if logfile:
-        GetFormatter(os.path.splitext(logfile)[1]).dump(InfoDict, FmmtParser.BinaryInfo,"Parser_Log_{}{}".format(os.path.basename(inputfile),os.path.splitext(logfile)[1]))
+        GetFormatter(logfile.lower()).dump(InfoDict, FmmtParser.BinaryInfo,"Parser_Log_{}{}".format(os.path.basename(inputfile),".{}".format(logfile.lower())))
     # 4. Data Encapsultion
     if outputfile:
         FmmtParser.Encapsulation(FmmtParser.WholeFvTree, False)

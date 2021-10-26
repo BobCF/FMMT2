@@ -6,11 +6,11 @@
 ##
 
 def GetFormatter(layout_format: str):
-    if layout_format == '.json':
+    if layout_format == 'json':
         return JsonFormatter()
-    elif layout_format == '.yaml':
+    elif layout_format == 'yaml':
         return YamlFormatter()
-    elif layout_format == ".html":
+    elif layout_format == 'html':
         return HtmlFormatter()
     else:
         return TxtFormatter()
