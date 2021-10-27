@@ -41,7 +41,7 @@ Important Changes and Updates:
 
 The Firmware Device is a persistent physical repository that contains firmware code and/or data. The firmware code and/or data stored in Firmware Volumes. Detail layout of Firmware Volumes is described in “Figure 1. The Firmware Volume Format”.
 
- ![1.](C:\Users\yuweiche\OneDrive - Intel Corporation\Pictures\1..png)
+![](Img/FirmwareVolumeFormat.png)
 
 ​													Figure 1. The Firmware Volume Format
 
@@ -97,9 +97,9 @@ When use the FMMT Python Tool with Build System:
 
 ### 2.2.1  Syntax for Parse file
 
-​	***-v < Inputfile > < Outputfile >***
+​	***-v < Inputfile > < Outputfile >  -l < LogFileType >*** 
 
-- Parse *Inputfile*, show its firmware layout with log file. *Outputfile* is optional, if inputs, the *Inputfile* will be encapsulated into *Outputfile* following the parsed firmware layout.
+- Parse *Inputfile*, show its firmware layout with log file. *Outputfile* is optional, if inputs, the *Inputfile* will be encapsulated into *Outputfile* following the parsed firmware layout. *"-l LogFileType"* is optional, it decides the format of log file which saves Binary layout. Currently supports: json, txt. More formats will be added in the future.
 
 ### 2.2.2  Syntax for Add a new FFS
 
@@ -155,7 +155,7 @@ The NodeTree will be created with parse function. When parse a file, a Root Node
 
 - After all Node created, the whole NodeTree saves all the info. (Can be used in other functions or print the whole firmware layout into log file)
 
- ![2.](C:\Users\yuweiche\OneDrive - Intel Corporation\Pictures\2..png)
+![](Img/NodeTreeFormat.png)
 
 ​																		Figure 2. The NodeTree format
 
