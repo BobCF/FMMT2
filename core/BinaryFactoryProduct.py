@@ -302,7 +302,7 @@ class FdProduct(BinaryProduct):
         while cur_index < data_size:
             if EFI_FIRMWARE_FILE_SYSTEM2_GUID_BYTE in whole_data[cur_index:]:
                 target_index = whole_data[cur_index:].index(EFI_FIRMWARE_FILE_SYSTEM2_GUID_BYTE) + cur_index
-                if whole_data[target_index+24:target_index+28] == FVH_SIGNATURE and whole_data[target_index-16:target_index] == ZEROVECTOR_BYTE:
+                if whole_data[target_index+24:target_index+28] == FVH_SIGNATURE:
                     Fd_Struct.append([FV_TREE, target_index - 16, unpack("Q", whole_data[target_index+16:target_index+24])])
                     cur_index = Fd_Struct[-1][1] + Fd_Struct[-1][2][0]
                 else:
@@ -314,7 +314,7 @@ class FdProduct(BinaryProduct):
         while cur_index < data_size:
             if EFI_FIRMWARE_FILE_SYSTEM3_GUID_BYTE in whole_data[cur_index:]:
                 target_index = whole_data[cur_index:].index(EFI_FIRMWARE_FILE_SYSTEM3_GUID_BYTE) + cur_index
-                if whole_data[target_index+24:target_index+28] == FVH_SIGNATURE and whole_data[target_index-16:target_index] == ZEROVECTOR_BYTE:
+                if whole_data[target_index+24:target_index+28] == FVH_SIGNATURE:
                     Fd_Struct.append([FV_TREE, target_index - 16, unpack("Q", whole_data[target_index+16:target_index+24])])
                     cur_index = Fd_Struct[-1][1] + Fd_Struct[-1][2][0]
                 else:
@@ -326,7 +326,7 @@ class FdProduct(BinaryProduct):
         while cur_index < data_size:
             if EFI_SYSTEM_NVDATA_FV_GUID_BYTE in whole_data[cur_index:]:
                 target_index = whole_data[cur_index:].index(EFI_SYSTEM_NVDATA_FV_GUID_BYTE) + cur_index
-                if whole_data[target_index+24:target_index+28] == FVH_SIGNATURE and whole_data[target_index-16:target_index] == ZEROVECTOR_BYTE:
+                if whole_data[target_index+24:target_index+28] == FVH_SIGNATURE:
                     Fd_Struct.append([DATA_FV_TREE, target_index - 16, unpack("Q", whole_data[target_index+16:target_index+24])])
                     cur_index = Fd_Struct[-1][1] + Fd_Struct[-1][2][0]
                 else:

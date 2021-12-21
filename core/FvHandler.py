@@ -491,7 +491,7 @@ class FvHandler:
                 Used_Size = Delete_Fv.Data.Size - Delete_Fv.Data.Free_Space - Add_Free_Space
                 Delete_Fv.Child[-1].Data.Data += Add_Free_Space * b'\xff'
                 Delete_Fv.Data.Free_Space += Add_Free_Space
-                New_Free_Space = Delete_Fv.Data.Free_Space + Add_Free_Space
+                New_Free_Space = Delete_Fv.Data.Free_Space
         else:
             if Delete_Fv.type == SEC_FV_TREE:
                 Used_Size = Delete_Fv.Data.Size - Add_Free_Space
