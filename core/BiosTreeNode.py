@@ -26,7 +26,7 @@ SectionHeaderType = {
     0x19:'EFI_SECTION_RAW',
     0x1B:'EFI_SECTION_PEI_DEPEX',
     0x1C:'EFI_SECTION_MM_DEPEX'
-}    
+}
 HeaderType = [0x01, 0x02, 0x14, 0x15, 0x18]
 
 class BinaryNode:

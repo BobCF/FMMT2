@@ -243,7 +243,7 @@ class FdProduct(BinaryProduct):
         data_size = len(whole_data)
         Binary_count = 0
         global Fv_count
-        # If the first Fv image is the Binary Fv, add it into the tree. 
+        # If the first Fv image is the Binary Fv, add it into the tree.
         if Fd_Struct[0][1] != 0:
             Binary_node = BIOSTREE('BINARY'+ str(Binary_count))
             Binary_node.type = BINARY_DATA

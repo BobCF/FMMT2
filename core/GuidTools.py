@@ -101,7 +101,7 @@ class GUIDTools:
     }
 
     def __init__(self, tooldef_file: str=None) -> None:
-        self.dir = os.path.dirname(__file__)
+        self.dir = os.path.join(os.path.dirname(__file__), "..")
         self.tooldef_file = tooldef_file if tooldef_file else os.path.join(
             self.dir, "FMMTConfig.ini")
         self.tooldef = dict()
@@ -133,10 +133,11 @@ class GUIDTools:
                 config_data = fd.readlines()
             for line in config_data:
                 try:
-                    guid, short_name, command = line.split()
-                    new_format_guid = struct2stream(ModifyGuidFormat(guid.strip()))
-                    self.tooldef[new_format_guid] = GUIDTool(
-                        guid.strip(), short_name.strip(), command.strip())
+                    if not line.startswith("#"):
+                        guid, short_name, command = line.split()
+                        new_format_guid = struct2stream(ModifyGuidFormat(guid.strip()))
+                        self.tooldef[new_format_guid] = GUIDTool(
+                            guid.strip(), short_name.strip(), command.strip())
                 except:
                     print("GuidTool load error!")
                     continue

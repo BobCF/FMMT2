@@ -81,9 +81,9 @@ class FvHandler:
     def CompressData(self, TargetTree) -> None:
         TreePath = TargetTree.GetTreePath()
         pos = len(TreePath)
-        self.Status = True
+        self.Status = False
         while pos:
-            if self.Status:
+            if not self.Status:
                 if TreePath[pos-1].type == SECTION_TREE and TreePath[pos-1].Data.Type == 0x02:
                     self.CompressSectionData(TreePath[pos-1], None, TreePath[pos-1].Data.ExtHeader.SectionDefinitionGuid)
                 else:
@@ -165,15 +165,10 @@ class FvHandler:
             elif len(CompressedData) == len(TargetTree.Data.OriData):
                 TargetTree.Data.OriData = CompressedData
             elif len(CompressedData) > len(TargetTree.Data.OriData):
-                New_Pad_Size = GetPadSize(CompressedData, 4)
+                New_Pad_Size = GetPadSize(len(CompressedData), 4)
                 self.Remain_New_Free_Space = len(CompressedData) + New_Pad_Size - len(TargetTree.Data.OriData) - len(TargetTree.Data.PadData)
-                Size_delta = len(TargetTree.Data.OriData) - len(CompressedData)
-                ChangeSize(TargetTree, -Size_delta)
-                if TargetTree.NextRel:
-                    TargetTree.Data.PadData = b'\x00' * New_Pad_Size
-                TargetTree.Data.OriData = CompressedData
                 self.ModifyTest(TargetTree, self.Remain_New_Free_Space)
-                self.Status = False
+                self.Status = True
 
     def ModifyFvExtData(self, TreeNode) -> None:
         FvExtData = b''
@@ -236,7 +231,7 @@ class FvHandler:
                         else:
                             ParTree.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
                 ChangeSize(ParTree, -Needed_Space)
-                New_Pad_Size = GetPadSize(ParTree.Data.Size, 8) 
+                New_Pad_Size = GetPadSize(ParTree.Data.Size, 8)
                 Delta_Pad_Size = New_Pad_Size - len(ParTree.Data.PadData)
                 Needed_Space += Delta_Pad_Size
                 ParTree.Data.PadData = b'\xff' * GetPadSize(ParTree.Data.Size, 8)
@@ -272,7 +267,7 @@ class FvHandler:
                         ParTree.Data.PadData = b''
                 elif Needed_Space:
                     ChangeSize(ParTree, -Needed_Space)
-                    New_Pad_Size = GetPadSize(ParTree.Data.Size, 4) 
+                    New_Pad_Size = GetPadSize(ParTree.Data.Size, 4)
                     Delta_Pad_Size = New_Pad_Size - len(ParTree.Data.PadData)
                     Needed_Space += Delta_Pad_Size
                     ParTree.Data.PadData = b'\x00' * New_Pad_Size
@@ -307,6 +302,7 @@ class FvHandler:
                 TargetFv.Data.ModExtHeaderData()
                 self.ModifyFvExtData(TargetFv)
                 TargetFv.Data.ModCheckSum()
+                self.CompressData(TargetFv)
                 # return the Status
                 self.Status = True
             # If TargetFv do not have enough free space, need move part of the free space of TargetFv's parent Fv to TargetFv/NewFfs.
@@ -373,6 +369,7 @@ class FvHandler:
             TargetFv.Data.ModExtHeaderData()
             self.ModifyFvExtData(TargetFv)
             TargetFv.Data.ModCheckSum()
+            self.CompressData(TargetFv)
         return self.Status
 
     def AddFfs(self) -> bool:
@@ -396,11 +393,13 @@ class FvHandler:
                 TargetFv.Data.ModCheckSum()
                 TargetFv.insertChild(self.NewFfs, -1)
                 ModifyFfsType(self.NewFfs)
+                self.CompressData(TargetFv)
             elif TargetLen == 0:
                 self.Status = True
                 TargetFv.Child.remove(self.TargetFfs)
                 TargetFv.insertChild(self.NewFfs)
                 ModifyFfsType(self.NewFfs)
+                self.CompressData(TargetFv)
             # If TargetFv do not have enough free space, need move part of the free space of TargetFv's parent Fv to TargetFv/NewFfs.
             else:
                 if TargetFv.type == FV_TREE:

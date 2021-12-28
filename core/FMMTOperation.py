@@ -45,6 +45,7 @@ def DeleteFfs(inputfile: str, TargetFfs_name: str, outputfile: str, Fv_name: str
         for item in FmmtParser.WholeFvTree.Findlist:
             if item.Parent.key != Fv_name and item.Parent.Data.Name != Fv_name:
                 FmmtParser.WholeFvTree.Findlist.remove(item)
+    Status = False
     if FmmtParser.WholeFvTree.Findlist != []:
         for Delete_Ffs in FmmtParser.WholeFvTree.Findlist:
             FfsMod = FvHandler(None, Delete_Ffs)

@@ -36,7 +36,7 @@ class BIOSTREE:
         self.Parent = None
         self.NextRel = None
         self.LastRel = None
- 
+
     def HasChild(self) -> bool:
         if self.Child == []:
             return False

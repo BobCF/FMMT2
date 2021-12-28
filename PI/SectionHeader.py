@@ -21,7 +21,7 @@ class EFI_COMMON_SECTION_HEADER(Structure):
     @property
     def SECTION_SIZE(self) -> int:
         return self.Size[0] | self.Size[1] << 8 | self.Size[2] << 16
-    
+
     def Common_Header_Size(self) -> int:
         return 4
 
