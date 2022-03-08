@@ -128,6 +128,7 @@ class FfsNode:
         self.ROffset = 0
         self.Data = b''
         self.PadData = b''
+        self.SectionMaxAlignment = 4
 
     def ModCheckSum(self) -> None:
         HeaderData = struct2stream(self.Header)
@@ -149,7 +150,7 @@ class SectionNode:
         if self.Header.Type in SectionHeaderType:
             self.Name = SectionHeaderType[self.Header.Type]
         elif self.Header.Type == 0:
-            self.Name = "EFI_SECTION_RAW"
+            self.Name = "EFI_SECTION_ALL"
         else:
             self.Name = "SECTION"
         if self.Header.Type in HeaderType:
@@ -167,6 +168,8 @@ class SectionNode:
         self.OriData = b''
         self.OriHeader = b''
         self.PadData = b''
+        self.IsPadSection = False
+        self.SectionMaxAlignment = 4
 
     def GetExtHeader(self, Type: int, buffer: bytes, nums: int=0) -> None:
         if Type == 0x01:

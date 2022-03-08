@@ -102,10 +102,18 @@ class GUIDTools:
 
     def __init__(self, tooldef_file: str=None) -> None:
         self.dir = os.path.join(os.path.dirname(__file__), "..")
-        self.tooldef_file = tooldef_file if tooldef_file else os.path.join(
-            self.dir, "FMMTConfig.ini")
+        self.tooldef_file = tooldef_file if tooldef_file else self.GetConfigFile()
         self.tooldef = dict()
         self.load()
+    
+    def GetConfigFile(self) -> str:
+        PathList = os.environ['PATH']
+        ConfigPath = os.path.join(self.dir, "FmmtConf.ini")
+        for CurrentPath in PathList:
+            if os.path.exists(os.path.join(CurrentPath, 'FmmtConf.ini')):
+                ConfigPath = os.path.join(CurrentPath, 'FmmtConf.ini')
+                break
+        return ConfigPath
 
     def VerifyTools(self) -> None:
         """

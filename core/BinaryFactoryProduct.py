@@ -37,9 +37,7 @@ class BinaryFactory():
 class BinaryProduct():
     ## Use GuidTool to decompress data.
     def DeCompressData(self, GuidTool, Section_Data: bytes) -> bytes:
-        ParPath = os.path.abspath(os.path.dirname(os.path.abspath(__file__))+os.path.sep+"..")
-        ToolPath = os.path.join(ParPath, r'FMMTConfig.ini')
-        guidtool = GUIDTools(ToolPath).__getitem__(struct2stream(GuidTool))
+        guidtool = GUIDTools().__getitem__(struct2stream(GuidTool))
         DecompressedData = guidtool.unpack(Section_Data)
         return DecompressedData
 
@@ -75,17 +73,17 @@ class SectionProduct(BinaryProduct):
     def ParserData(self, Section_Tree, whole_Data: bytes, Rel_Whole_Offset: int=0) -> None:
         if Section_Tree.Data.Type == 0x01:
             Section_Tree.Data.OriData = Section_Tree.Data.Data
-            self.ParserFfs(Section_Tree, b'')
+            self.ParserSection(Section_Tree, b'')
         # Guided Define Section
         elif Section_Tree.Data.Type == 0x02:
             Section_Tree.Data.OriData = Section_Tree.Data.Data
             DeCompressGuidTool = Section_Tree.Data.ExtHeader.SectionDefinitionGuid
             Section_Tree.Data.Data = self.DeCompressData(DeCompressGuidTool, Section_Tree.Data.Data)
             Section_Tree.Data.Size = len(Section_Tree.Data.Data) + Section_Tree.Data.HeaderLength
-            self.ParserFfs(Section_Tree, b'')
+            self.ParserSection(Section_Tree, b'')
         elif Section_Tree.Data.Type == 0x03:
             Section_Tree.Data.OriData = Section_Tree.Data.Data
-            self.ParserFfs(Section_Tree, b'')
+            self.ParserSection(Section_Tree, b'')
         # SEC_FV Section
         elif Section_Tree.Data.Type == 0x17:
             global Fv_count
@@ -99,7 +97,7 @@ class SectionProduct(BinaryProduct):
             Section_Tree.insertChild(Sec_Fv_Tree)
             Fv_count += 1
 
-    def ParserFfs(self, ParTree, Whole_Data: bytes, Rel_Whole_Offset: int=0) -> None:
+    def ParserSection(self, ParTree, Whole_Data: bytes, Rel_Whole_Offset: int=0) -> None:
         Rel_Offset = 0
         Section_Offset = 0
         # Get the Data from parent tree, if do not have the tree then get it from the whole_data.
@@ -133,6 +131,9 @@ class SectionProduct(BinaryProduct):
                 ParTree.Data.Version = Section_Info.ExtHeader.GetVersionString()
             if Section_Info.Header.Type == 0x15:
                 ParTree.Data.UiName = Section_Info.ExtHeader.GetUiString()
+            if Section_Info.Header.Type == 0x19:
+                if Section_Info.Data.replace(b'\x00', b'') == b'':
+                    Section_Info.IsPadSection = True
             Section_Offset += Section_Info.Size + Pad_Size
             Rel_Offset += Section_Info.Size + Pad_Size
             Section_Tree.Data = Section_Info
@@ -175,6 +176,9 @@ class FfsProduct(BinaryProduct):
                 ParTree.Data.Version = Section_Info.ExtHeader.GetVersionString()
             if Section_Info.Header.Type == 0x15:
                 ParTree.Data.UiName = Section_Info.ExtHeader.GetUiString()
+            if Section_Info.Header.Type == 0x19:
+                if Section_Info.Data.replace(b'\x00', b'') == b'':
+                    Section_Info.IsPadSection = True
             Section_Offset += Section_Info.Size + Pad_Size
             Rel_Offset += Section_Info.Size + Pad_Size
             Section_Tree.Data = Section_Info

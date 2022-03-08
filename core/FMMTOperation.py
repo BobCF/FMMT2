@@ -12,7 +12,7 @@ global Fv_count
 Fv_count = 0
 
 # The ROOT_TYPE can be 'ROOT_TREE', 'ROOT_FV_TREE', 'ROOT_FFS_TREE', 'ROOT_SECTION_TREE'
-def ParserFile(inputfile: str, ROOT_TYPE: str, logfile: str=None, outputfile: str=None) -> None:
+def ViewFile(inputfile: str, ROOT_TYPE: str, logfile: str=None, outputfile: str=None) -> None:
     # 1. Data Prepare
     with open(inputfile, "rb") as f:
         whole_data = f.read()

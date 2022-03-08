@@ -13,6 +13,7 @@ from PI.Common import *
 EFI_FVB2_ERASE_POLARITY = 0x00000800
 
 def ChangeSize(TargetTree, size_delta: int=0) -> None:
+    # If Size increase delta, then should be: size_delta = -delta
     if type(TargetTree.Data.Header) == type(EFI_FFS_FILE_HEADER2()) or type(TargetTree.Data.Header) == type(EFI_COMMON_SECTION_HEADER2()):
         TargetTree.Data.Size -= size_delta
         TargetTree.Data.Header.ExtendedSize -= size_delta
@@ -35,8 +36,11 @@ def ModifyFfsType(TargetFfs) -> None:
         New_Header.Name = TargetFfs.Data.Header.Name
         New_Header.IntegrityCheck = TargetFfs.Data.Header.IntegrityCheck
         New_Header.Type = TargetFfs.Data.Header.Type
-        New_Header.Attributes = TargetFfs.Data.Header.Attributes
-        New_Header.Size = 0
+        New_Header.Attributes = TargetFfs.Data.Header.Attributes | 0x01  # set the Attribute with FFS_ATTRIB_LARGE_FILE (0x01)
+        NewSize = 0
+        New_Header.Size[0] = NewSize % (16**2)    # minus the delta size of Header
+        New_Header.Size[1] = NewSize % (16**4) //(16**2)
+        New_Header.Size[2] = NewSize // (16**4)
         New_Header.State = TargetFfs.Data.Header.State
         New_Header.ExtendedSize = ExtendSize
         TargetFfs.Data.Header = New_Header
@@ -48,8 +52,10 @@ def ModifyFfsType(TargetFfs) -> None:
         New_Header.Name = TargetFfs.Data.Header.Name
         New_Header.IntegrityCheck = TargetFfs.Data.Header.IntegrityCheck
         New_Header.Type = TargetFfs.Data.Header.Type
-        New_Header.Attributes = TargetFfs.Data.Header.Attributes
-        New_Header.Size = TargetFfs.Data.HeaderLength + TargetFfs.Data.Size
+        New_Header.Attributes = TargetFfs.Data.Header.Attributes - 1  # remove the FFS_ATTRIB_LARGE_FILE (0x01) from Attribute
+        New_Header.Size[0] = (TargetFfs.Data.Size - 8) % (16**2)    # minus the delta size of Header
+        New_Header.Size[1] = (TargetFfs.Data.Size - 8) % (16**4) //(16**2)
+        New_Header.Size[2] = (TargetFfs.Data.Size - 8) // (16**4)
         New_Header.State = TargetFfs.Data.Header.State
         TargetFfs.Data.Header = New_Header
         TargetFfs.Data.Size = TargetFfs.Data.Header.FFS_FILE_SIZE
@@ -69,6 +75,69 @@ def ModifyFfsType(TargetFfs) -> None:
             if TarParent.type == FV_TREE and struct2stream(TarParent.Data.Header.FileSystemGuid) == EFI_FIRMWARE_FILE_SYSTEM2_GUID_BYTE:
                 TarParent.Data.Header.FileSystemGuid = ModifyGuidFormat("5473C07A-3DCB-4dca-BD6F-1E9689E7349A")
             TarParent = TarParent.Parent
+
+def PadSectionModify(PadSection, Offset) -> None:
+    # Offset > 0, Size decrease; Offset < 0, Size increase;
+    ChangeSize(PadSection, Offset)
+    PadSection.Data.Data = (PadSection.Data.Size - PadSection.Data.HeaderLength) * b'\xff'
+
+def ModifySectionType(TargetSection) -> None:
+    if type(TargetSection.Data.Header) == type(EFI_COMMON_SECTION_HEADER()) and TargetSection.Data.Size >= 0xFFFFFF:
+        New_Header = EFI_COMMON_SECTION_HEADER2()
+        New_Header.Type = TargetSection.Data.Header.Type
+        NewSize = 0xFFFFFF
+        New_Header.Size[0] = NewSize % (16**2)    # minus the delta size of Header
+        New_Header.Size[1] = NewSize % (16**4) //(16**2)
+        New_Header.Size[2] = NewSize // (16**4)
+        New_Header.ExtendedSize = TargetSection.Data.Size + 4
+        TargetSection.Data.Header = New_Header
+        TargetSection.Data.Size = TargetSection.Data.Header.SECTION_SIZE
+        if TargetSection.LastRel.Data.IsPadSection:
+            PadSectionModify(TargetSection.LastRel, -4)
+        else:
+            SecParent = TargetSection.Parent
+            Target_index = SecParent.Child.index(TargetSection)
+            NewPadSection = SectionNode(b'\x00\x00\x00\x19')
+            SecParent.insertChild(NewPadSection, Target_index)
+    elif type(TargetSection.Data.Header) == type(EFI_COMMON_SECTION_HEADER2()) and TargetSection.Data.Size < 0xFFFFFF:
+        New_Header = EFI_COMMON_SECTION_HEADER()
+        New_Header.Type = TargetSection.Data.Header.Type
+        New_Header.Size[0] = (TargetSection.Data.Size - 4) % (16**2)    # minus the delta size of Header
+        New_Header.Size[1] = (TargetSection.Data.Size - 4) % (16**4) //(16**2)
+        New_Header.Size[2] = (TargetSection.Data.Size - 4) // (16**4)
+        TargetSection.Data.Header = New_Header
+        TargetSection.Data.Size = TargetSection.Data.Header.SECTION_SIZE
+        if TargetSection.LastRel.Data.IsPadSection:
+            PadSectionModify(TargetSection.LastRel, -4)
+        else:
+            SecParent = TargetSection.Parent
+            Target_index = SecParent.Child.index(TargetSection)
+            NewPadSection = SectionNode(b'\x00\x00\x00\x19')
+            SecParent.insertChild(NewPadSection, Target_index)
+
+def ModifyFvExtData(TreeNode) -> None:
+    FvExtData = b''
+    if TreeNode.Data.Header.ExtHeaderOffset:
+        FvExtHeader = struct2stream(TreeNode.Data.ExtHeader)
+        FvExtData += FvExtHeader
+    if TreeNode.Data.Header.ExtHeaderOffset and TreeNode.Data.ExtEntryExist:
+        FvExtEntry = struct2stream(TreeNode.Data.ExtEntry)
+        FvExtData += FvExtEntry
+    if FvExtData:
+        InfoNode = TreeNode.Child[0]
+        InfoNode.Data.Data = FvExtData + InfoNode.Data.Data[TreeNode.Data.ExtHeader.ExtHeaderSize:]
+        InfoNode.Data.ModCheckSum()
+
+def ModifyFvSystemGuid(TargetFv) -> None:
+    if struct2stream(TargetFv.Data.Header.FileSystemGuid) == EFI_FIRMWARE_FILE_SYSTEM2_GUID_BYTE:
+        TargetFv.Data.Header.FileSystemGuid = ModifyGuidFormat("5473C07A-3DCB-4dca-BD6F-1E9689E7349A")
+    TargetFv.Data.ModCheckSum()
+    TargetFv.Data.Data = b''
+    for item in TargetFv.Child:
+        if item.type == FFS_FREE_SPACE:
+            TargetFv.Data.Data += item.Data.Data + item.Data.PadData
+        else:
+            TargetFv.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
 
 class FvHandler:
     def __init__(self, NewFfs, TargetFfs) -> None:
@@ -135,7 +204,7 @@ class FvHandler:
                 TargetTree.Data.ModFvExt()
                 TargetTree.Data.ModFvSize()
                 TargetTree.Data.ModExtHeaderData()
-                self.ModifyFvExtData(TargetTree)
+                ModifyFvExtData(TargetTree)
                 TargetTree.Data.ModCheckSum()
             elif TargetTree.type == SECTION_TREE and TargetTree.Data.Type != 0x02:
                 New_Pad_Size = GetPadSize(len(NewData), 4)
@@ -147,9 +216,7 @@ class FvHandler:
                     TargetTree.Data.PadData = b'\x00' * New_Pad_Size
             TargetTree.Data.Data = NewData
         if GuidTool:
-            ParPath = os.path.abspath(os.path.dirname(os.path.abspath(__file__))+os.path.sep+"..")
-            ToolPath = os.path.join(ParPath, r'FMMTConfig.ini')
-            guidtool = GUIDTools(ToolPath).__getitem__(struct2stream(GuidTool))
+            guidtool = GUIDTools().__getitem__(struct2stream(GuidTool))
             CompressedData = guidtool.pack(TargetTree.Data.Data)
             if len(CompressedData) < len(TargetTree.Data.OriData):
                 New_Pad_Size = GetPadSize(len(CompressedData), 4)
@@ -169,19 +236,6 @@ class FvHandler:
                 self.Remain_New_Free_Space = len(CompressedData) + New_Pad_Size - len(TargetTree.Data.OriData) - len(TargetTree.Data.PadData)
                 self.ModifyTest(TargetTree, self.Remain_New_Free_Space)
                 self.Status = True
-
-    def ModifyFvExtData(self, TreeNode) -> None:
-        FvExtData = b''
-        if TreeNode.Data.Header.ExtHeaderOffset:
-            FvExtHeader = struct2stream(TreeNode.Data.ExtHeader)
-            FvExtData += FvExtHeader
-        if TreeNode.Data.Header.ExtHeaderOffset and TreeNode.Data.ExtEntryExist:
-            FvExtEntry = struct2stream(TreeNode.Data.ExtEntry)
-            FvExtData += FvExtEntry
-        if FvExtData:
-            InfoNode = TreeNode.Child[0]
-            InfoNode.Data.Data = FvExtData + InfoNode.Data.Data[TreeNode.Data.ExtHeader.ExtHeaderSize:]
-            InfoNode.Data.ModCheckSum()
 
     def ModifyTest(self, ParTree, Needed_Space: int) -> None:
         if Needed_Space > 0:
@@ -207,6 +261,7 @@ class FvHandler:
                             ParTree.Data.Free_Space = 0
                         ParTree.Data.Size += Needed_Space
                         ParTree.Data.Header.Fvlength = ParTree.Data.Size
+                ModifyFvSystemGuid(ParTree)
                 for item in ParTree.Child:
                     if item.type == FFS_FREE_SPACE:
                         ParTree.Data.Data += item.Data.Data + item.Data.PadData
@@ -215,10 +270,11 @@ class FvHandler:
                 ParTree.Data.ModFvExt()
                 ParTree.Data.ModFvSize()
                 ParTree.Data.ModExtHeaderData()
-                self.ModifyFvExtData(ParTree)
+                ModifyFvExtData(ParTree)
                 ParTree.Data.ModCheckSum()
             elif ParTree.type == FFS_TREE:
                 ParTree.Data.Data = b''
+                OriHeaderLen = ParTree.Data.HeaderLength
                 for item in ParTree.Child:
                     if item.Data.OriData:
                         if item.Data.ExtHeader:
@@ -231,6 +287,8 @@ class FvHandler:
                         else:
                             ParTree.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
                 ChangeSize(ParTree, -Needed_Space)
+                ModifyFfsType(ParTree)
+                Needed_Space += ParTree.Data.HeaderLength - OriHeaderLen
                 New_Pad_Size = GetPadSize(ParTree.Data.Size, 8)
                 Delta_Pad_Size = New_Pad_Size - len(ParTree.Data.PadData)
                 Needed_Space += Delta_Pad_Size
@@ -238,6 +296,7 @@ class FvHandler:
                 ParTree.Data.ModCheckSum()
             elif ParTree.type == SECTION_TREE:
                 OriData = ParTree.Data.Data
+                OriHeaderLen = ParTree.Data.HeaderLength
                 ParTree.Data.Data = b''
                 for item in ParTree.Child:
                     if item.type == SECTION_TREE and item.Data.ExtHeader and item.Data.Type != 0x02:
@@ -247,7 +306,6 @@ class FvHandler:
                     else:
                         ParTree.Data.Data += struct2stream(item.Data.Header) + item.Data.Data + item.Data.PadData
                 if ParTree.Data.Type == 0x02:
-                    ParTree.Data.Size += Needed_Space
                     ParPath = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
                     ToolPath = os.path.join(os.path.dirname(ParPath), r'FMMTConfig.ini')
                     guidtool = GUIDTools(ToolPath).__getitem__(struct2stream(ParTree.Data.ExtHeader.SectionDefinitionGuid))
@@ -258,8 +316,11 @@ class FvHandler:
                     ParTree.Data.Header.Size[0] = New_Size % (16**2)
                     ParTree.Data.Header.Size[1] = New_Size % (16**4) //(16**2)
                     ParTree.Data.Header.Size[2] = New_Size // (16**4)
+                    ParTree.Data.Size = ParTree.Data.Header.SECTION_SIZE
+                    ModifySectionType(ParTree)
+                    Needed_Space += ParTree.Data.HeaderLength - OriHeaderLen
                     if ParTree.NextRel:
-                        New_Pad_Size = GetPadSize(New_Size, 4)
+                        New_Pad_Size = GetPadSize(ParTree.Data.Size, 4)
                         Delta_Pad_Size = New_Pad_Size - len(ParTree.Data.PadData)
                         ParTree.Data.PadData = b'\x00' * New_Pad_Size
                         Needed_Space += Delta_Pad_Size
@@ -267,6 +328,8 @@ class FvHandler:
                         ParTree.Data.PadData = b''
                 elif Needed_Space:
                     ChangeSize(ParTree, -Needed_Space)
+                    ModifySectionType(ParTree)
+                    Needed_Space += ParTree.Data.HeaderLength - OriHeaderLen
                     New_Pad_Size = GetPadSize(ParTree.Data.Size, 4)
                     Delta_Pad_Size = New_Pad_Size - len(ParTree.Data.PadData)
                     Needed_Space += Delta_Pad_Size
@@ -300,7 +363,7 @@ class FvHandler:
                 TargetFv.Data.ModFvExt()
                 TargetFv.Data.ModFvSize()
                 TargetFv.Data.ModExtHeaderData()
-                self.ModifyFvExtData(TargetFv)
+                ModifyFvExtData(TargetFv)
                 TargetFv.Data.ModCheckSum()
                 self.CompressData(TargetFv)
                 # return the Status
@@ -338,7 +401,7 @@ class FvHandler:
                     TargetFv.Data.ModFvExt()
                     TargetFv.Data.ModFvSize()
                     TargetFv.Data.ModExtHeaderData()
-                    self.ModifyFvExtData(TargetFv)
+                    ModifyFvExtData(TargetFv)
                     TargetFv.Data.ModCheckSum()
                     # Start free space calculating and moving process.
                     self.ModifyTest(TargetFv.Parent, Needed_Space)
@@ -367,7 +430,7 @@ class FvHandler:
             TargetFv.Data.ModFvExt()
             TargetFv.Data.ModFvSize()
             TargetFv.Data.ModExtHeaderData()
-            self.ModifyFvExtData(TargetFv)
+            ModifyFvExtData(TargetFv)
             TargetFv.Data.ModCheckSum()
             self.CompressData(TargetFv)
         return self.Status
@@ -389,7 +452,7 @@ class FvHandler:
                 TargetFv.Data.Free_Space = (-TargetLen)
                 TargetFv.Data.ModFvExt()
                 TargetFv.Data.ModExtHeaderData()
-                self.ModifyFvExtData(TargetFv)
+                ModifyFvExtData(TargetFv)
                 TargetFv.Data.ModCheckSum()
                 TargetFv.insertChild(self.NewFfs, -1)
                 ModifyFfsType(self.NewFfs)
@@ -419,6 +482,7 @@ class FvHandler:
                         TargetFv.insertChild(self.NewFfs)
                         TargetFv.Data.Free_Space = 0
                     ModifyFfsType(self.NewFfs)
+                    ModifyFvSystemGuid(TargetFv)
                     TargetFv.Data.Data = b''
                     for item in TargetFv.Child:
                         if item.type == FFS_FREE_SPACE:
@@ -431,7 +495,7 @@ class FvHandler:
                     TargetFv.Data.ModFvExt()
                     TargetFv.Data.ModFvSize()
                     TargetFv.Data.ModExtHeaderData()
-                    self.ModifyFvExtData(TargetFv)
+                    ModifyFvExtData(TargetFv)
                     TargetFv.Data.ModCheckSum()
                     # Start free space calculating and moving process.
                     self.ModifyTest(TargetFv.Parent, TargetLen)
@@ -458,6 +522,7 @@ class FvHandler:
                 else:
                     TargetFv.insertChild(self.NewFfs)
                 ModifyFfsType(self.NewFfs)
+                ModifyFvSystemGuid(TargetFv)
                 TargetFv.Data.Data = b''
                 for item in TargetFv.Child:
                     if item.type == FFS_FREE_SPACE:
@@ -469,7 +534,7 @@ class FvHandler:
                 TargetFv.Data.ModFvExt()
                 TargetFv.Data.ModFvSize()
                 TargetFv.Data.ModExtHeaderData()
-                self.ModifyFvExtData(TargetFv)
+                ModifyFvExtData(TargetFv)
                 TargetFv.Data.ModCheckSum()
                 self.ModifyTest(TargetFv.Parent, TargetLen)
         return self.Status
@@ -513,7 +578,7 @@ class FvHandler:
         Delete_Fv.Data.ModFvExt()
         Delete_Fv.Data.ModFvSize()
         Delete_Fv.Data.ModExtHeaderData()
-        self.ModifyFvExtData(Delete_Fv)
+        ModifyFvExtData(Delete_Fv)
         Delete_Fv.Data.ModCheckSum()
         self.CompressData(Delete_Fv)
         self.Status = True

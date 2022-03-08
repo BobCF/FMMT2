@@ -40,6 +40,11 @@ class FMMT():
     def __init__(self) -> None:
         self.firmware_packet = {}
 
+    def SetDestPath(self, inputfile:str) -> str:
+        self.dest_path = os.path.dirname(os.path.abspath(inputfile))
+        old_env = os.environ['PATH']
+        os.environ['PATH'] = self.dest_path + os.pathsep + old_env
+
     def CheckFfsName(self, FfsName:str) -> str:
         try:
             return uuid.UUID(FfsName)
@@ -47,7 +52,8 @@ class FMMT():
             return FfsName
 
     def View(self, inputfile: str, logfiletype: str=None, outputfile: str=None) -> None:
-        # ParserFile(inputfile, ROOT_TYPE, logfile, outputfile)
+        # ViewFile(inputfile, ROOT_TYPE, logfile, outputfile)
+        self.SetDestPath(inputfile)
         filetype = os.path.splitext(inputfile)[1].lower()
         if filetype == '.fd':
             ROOT_TYPE = ROOT_TREE
@@ -59,21 +65,25 @@ class FMMT():
             ROOT_TYPE = ROOT_SECTION_TREE
         else:
             ROOT_TYPE = ROOT_TREE
-        ParserFile(inputfile, ROOT_TYPE, logfiletype, outputfile)
+        ViewFile(inputfile, ROOT_TYPE, logfiletype, outputfile)
 
     def Delete(self, inputfile: str, TargetFfs_name: str, outputfile: str, Fv_name: str=None) -> None:
+        self.SetDestPath(inputfile)
         if Fv_name:
             DeleteFfs(inputfile, self.CheckFfsName(TargetFfs_name), outputfile, uuid.UUID(Fv_name))
         else:
             DeleteFfs(inputfile, self.CheckFfsName(TargetFfs_name), outputfile)
 
     def Extract(self, inputfile: str, Ffs_name: str, outputfile: str) -> None:
+        self.SetDestPath(inputfile)
         ExtractFfs(inputfile, self.CheckFfsName(Ffs_name), outputfile)
 
     def Add(self, inputfile: str, Fv_name: str, newffsfile: str, outputfile: str) -> None:
+        self.SetDestPath(inputfile)
         AddNewFfs(inputfile, self.CheckFfsName(Fv_name), newffsfile, outputfile)
 
     def Replace(self,inputfile: str, Ffs_name: str, newffsfile: str, outputfile: str, Fv_name: str=None) -> None:
+        self.SetDestPath(inputfile)
         if Fv_name:
             ReplaceFfs(inputfile, self.CheckFfsName(Ffs_name), newffsfile, outputfile, uuid.UUID(Fv_name))
         else:

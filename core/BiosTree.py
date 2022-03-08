@@ -101,9 +101,8 @@ class BIOSTREE:
     def FindNode(self, key: str, Findlist: list) -> None:
         if self.key == key or (self.Data and self.Data.Name == key) or (self.type == FFS_TREE and self.Data.UiName == key):
             Findlist.append(self)
-        else:
-            for item in self.Child:
-                item.FindNode(key, Findlist)
+        for item in self.Child:
+            item.FindNode(key, Findlist)
 
     def GetTreePath(self):
         BiosTreePath = [self]
