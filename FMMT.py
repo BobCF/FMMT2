@@ -24,7 +24,8 @@ parser.add_argument("-d", "--Delete", dest="Delete", nargs='+',
                     help="Delete a Ffs from FV: '-d inputfile TargetFfsName outputfile TargetFvName(Optional,\
                     If not given, wil delete all the existed target Ffs)'")
 parser.add_argument("-e", "--Extract", dest="Extract", nargs='+',
-                    help="Extract a Ffs Info: '-e inputfile TargetFfsName outputfile'")
+                    help="Extract a Ffs Info: '-e inputfile TargetFfsName outputfile TargetFvName(Optional,\
+                    If not given, wil extract the first target Ffs)'")
 parser.add_argument("-a", "--Add", dest="Add", nargs='+',
                     help="Add a Ffs into a FV:'-a inputfile TargetFvName newffsfile outputfile'")
 parser.add_argument("-r", "--Replace", dest="Replace", nargs='+',
@@ -74,9 +75,12 @@ class FMMT():
         else:
             DeleteFfs(inputfile, self.CheckFfsName(TargetFfs_name), outputfile)
 
-    def Extract(self, inputfile: str, Ffs_name: str, outputfile: str) -> None:
+    def Extract(self, inputfile: str, Ffs_name: str, outputfile: str, Fv_name: str=None) -> None:
         self.SetDestPath(inputfile)
-        ExtractFfs(inputfile, self.CheckFfsName(Ffs_name), outputfile)
+        if Fv_name:
+            ExtractFfs(inputfile, self.CheckFfsName(Ffs_name), outputfile, uuid.UUID(Fv_name))
+        else:
+            ExtractFfs(inputfile, self.CheckFfsName(Ffs_name), outputfile)
 
     def Add(self, inputfile: str, Fv_name: str, newffsfile: str, outputfile: str) -> None:
         self.SetDestPath(inputfile)
@@ -107,7 +111,10 @@ def main():
             else:
                 fmmt.Delete(args.Delete[0],args.Delete[1],args.Delete[2])
         if args.Extract:
-            fmmt.Extract(args.Extract[0],args.Extract[1],args.Extract[2])
+            if len(args.Extract) == 4:
+                fmmt.Extract(args.Extract[0],args.Extract[1],args.Extract[2], args.Extract[3])
+            else:
+                fmmt.Extract(args.Extract[0],args.Extract[1],args.Extract[2])
         if args.Add:
             fmmt.Add(args.Add[0],args.Add[1],args.Add[2],args.Add[3])
         if args.Replace:

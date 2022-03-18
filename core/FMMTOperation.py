@@ -122,12 +122,16 @@ def ReplaceFfs(inputfile: str, Ffs_name: str, newffsfile: str, outputfile: str, 
         with open(outputfile, "wb") as f:
             f.write(FmmtParser.FinalData)
 
-def ExtractFfs(inputfile: str, Ffs_name: str, outputfile: str) -> None:
+def ExtractFfs(inputfile: str, Ffs_name: str, outputfile: str, Fv_name: str=None) -> None:
     with open(inputfile, "rb") as f:
         whole_data = f.read()
     FmmtParser = FMMTParser(inputfile, ROOT_TREE)
     FmmtParser.ParserFromRoot(FmmtParser.WholeFvTree, whole_data)
     FmmtParser.WholeFvTree.FindNode(Ffs_name, FmmtParser.WholeFvTree.Findlist)
+    if Fv_name:
+        for item in FmmtParser.WholeFvTree.Findlist:
+            if item.Parent.key != Fv_name and item.Parent.Data.Name != Fv_name:
+                FmmtParser.WholeFvTree.Findlist.remove(item)
     if FmmtParser.WholeFvTree.Findlist != []:
         TargetNode = FmmtParser.WholeFvTree.Findlist[0]
         TargetFv = TargetNode.Parent
