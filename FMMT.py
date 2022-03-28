@@ -52,6 +52,12 @@ class FMMT():
         except:
             return FfsName
 
+    def GetFvName(self, FvName:str) -> str:
+        try:
+            return uuid.UUID(FvName)
+        except:
+            return FvName
+
     def View(self, inputfile: str, logfiletype: str=None, outputfile: str=None) -> None:
         # ViewFile(inputfile, ROOT_TYPE, logfile, outputfile)
         self.SetDestPath(inputfile)
@@ -71,14 +77,14 @@ class FMMT():
     def Delete(self, inputfile: str, TargetFfs_name: str, outputfile: str, Fv_name: str=None) -> None:
         self.SetDestPath(inputfile)
         if Fv_name:
-            DeleteFfs(inputfile, self.CheckFfsName(TargetFfs_name), outputfile, uuid.UUID(Fv_name))
+            DeleteFfs(inputfile, self.CheckFfsName(TargetFfs_name), outputfile, self.GetFvName(Fv_name))
         else:
             DeleteFfs(inputfile, self.CheckFfsName(TargetFfs_name), outputfile)
 
     def Extract(self, inputfile: str, Ffs_name: str, outputfile: str, Fv_name: str=None) -> None:
         self.SetDestPath(inputfile)
         if Fv_name:
-            ExtractFfs(inputfile, self.CheckFfsName(Ffs_name), outputfile, uuid.UUID(Fv_name))
+            ExtractFfs(inputfile, self.CheckFfsName(Ffs_name), outputfile, self.GetFvName(Fv_name))
         else:
             ExtractFfs(inputfile, self.CheckFfsName(Ffs_name), outputfile)
 
@@ -89,7 +95,7 @@ class FMMT():
     def Replace(self,inputfile: str, Ffs_name: str, newffsfile: str, outputfile: str, Fv_name: str=None) -> None:
         self.SetDestPath(inputfile)
         if Fv_name:
-            ReplaceFfs(inputfile, self.CheckFfsName(Ffs_name), newffsfile, outputfile, uuid.UUID(Fv_name))
+            ReplaceFfs(inputfile, self.CheckFfsName(Ffs_name), newffsfile, outputfile, self.GetFvName(Fv_name))
         else:
             ReplaceFfs(inputfile, self.CheckFfsName(Ffs_name), newffsfile, outputfile)
 
