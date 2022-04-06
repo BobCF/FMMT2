@@ -8,6 +8,7 @@ from PI.FvHeader import *
 from PI.FfsFileHeader import *
 from PI.SectionHeader import *
 from PI.Common import *
+from utils.FmmtLogger import FmmtLogger as logger
 import uuid
 
 SectionHeaderType = {
@@ -70,10 +71,8 @@ class FvNode:
         self.ROffset = 0
         self.Data = b''
         if self.Header.Signature != 1213613663:
-            print('Invalid! Fv Header Signature {} is not "_FVH".'.format(self.Header.Signature))
-            with open(str(self.Name)+'.fd', "wb") as f:
-                f.write(struct2stream(self.Header))
-            assert False
+            logger.error('Invalid Fv Header! Fv {} signature {} is not "_FVH".'.format(struct2stream(self.Header), self.Header.Signature))
+            raise Exception("Process Failed: Fv Header Signature!")
         self.PadData = b''
         self.Free_Space = 0
         self.ModCheckSum()
@@ -115,7 +114,8 @@ class FfsNode:
         self.Header = EFI_FFS_FILE_HEADER.from_buffer_copy(buffer)
         # self.Attributes = unpack("<B", buffer[21:22])[0]
         if self.Header.FFS_FILE_SIZE != 0 and self.Header.Attributes != 0xff and self.Header.Attributes & 0x01 == 1:
-            print('Error Ffs Header! Ffs Header Size and Attributes is not matched!')
+            logger.error('Error Ffs Header! Ffs {} Header Size and Attributes is not matched!'.format(uuid.UUID(bytes_le=struct2stream(self.Header.Name))))
+            raise Exception("Process Failed: Error Ffs Header!")
         if self.Header.FFS_FILE_SIZE == 0 and self.Header.Attributes & 0x01 == 1:
             self.Header = EFI_FFS_FILE_HEADER2.from_buffer_copy(buffer)
         self.Name = uuid.UUID(bytes_le=struct2stream(self.Header.Name))

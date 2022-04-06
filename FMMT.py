@@ -31,8 +31,16 @@ parser.add_argument("-a", "--Add", dest="Add", nargs='+',
 parser.add_argument("-r", "--Replace", dest="Replace", nargs='+',
                     help="Replace a Ffs in a FV: '-r inputfile TargetFfsName newffsfile outputfile TargetFvName(Optional,\
                         If not given, wil replace all the existed target Ffs with new Ffs file)'")
-parser.add_argument("-l", "--LogFileType", dest="LogFileType", nargs='+',
-                    help="The format of log file which saves Binary layout. Currently supports: json, txt. More formats will be added in the future")
+parser.add_argument("-l", "--LayoutFileName", dest="LayoutFileName", nargs='+',
+                    help="The output file which saves Binary layout: '-l xxx.txt'/'-l xxx.json'\
+                        If only provide file format as 'txt', \
+                        the file will be generated with default name (Layout_'InputFileName'.txt). \
+                        Currently supports two formats: json, txt. More formats will be added in the future")
+parser.add_argument("-c", "--ConfigFilePath", dest="ConfigFilePath", nargs='+',
+                    help="Provide the target FmmtConf.ini file path: '-c C:\Code\FmmtConf.ini' \
+                        FmmtConf file saves the target guidtool used in compress/uncompress process.\
+                        If do not provide, FMMT tool will search the inputfile folder for FmmtConf.ini firstly, if not found,\
+                        the FmmtConf.ini saved in FMMT tool's folder will be used as default.")
 
 def print_banner():
     print("")
@@ -41,7 +49,11 @@ class FMMT():
     def __init__(self) -> None:
         self.firmware_packet = {}
 
+    def SetConfigFilePath(self, configfilepath:str) -> str:
+        os.environ['FmmtConfPath'] = os.path.abspath(configfilepath)
+
     def SetDestPath(self, inputfile:str) -> str:
+        os.environ['FmmtConfPath'] = ''
         self.dest_path = os.path.dirname(os.path.abspath(inputfile))
         old_env = os.environ['PATH']
         os.environ['PATH'] = self.dest_path + os.pathsep + old_env
@@ -58,7 +70,7 @@ class FMMT():
         except:
             return FvName
 
-    def View(self, inputfile: str, logfiletype: str=None, outputfile: str=None) -> None:
+    def View(self, inputfile: str, layoutfilename: str=None, outputfile: str=None) -> None:
         # ViewFile(inputfile, ROOT_TYPE, logfile, outputfile)
         self.SetDestPath(inputfile)
         filetype = os.path.splitext(inputfile)[1].lower()
@@ -72,7 +84,7 @@ class FMMT():
             ROOT_TYPE = ROOT_SECTION_TREE
         else:
             ROOT_TYPE = ROOT_TREE
-        ViewFile(inputfile, ROOT_TYPE, logfiletype, outputfile)
+        ViewFile(inputfile, ROOT_TYPE, layoutfilename, outputfile)
 
     def Delete(self, inputfile: str, TargetFfs_name: str, outputfile: str, Fv_name: str=None) -> None:
         self.SetDestPath(inputfile)
@@ -106,9 +118,11 @@ def main():
 
     try:
         fmmt=FMMT()
+        if args.ConfigFilePath:
+            fmmt.SetConfigFilePath(args.ConfigFilePath[0])
         if args.View:
-            if args.LogFileType:
-                fmmt.View(args.View[0], args.LogFileType[0])
+            if args.LayoutFileName:
+                fmmt.View(args.View[0], args.LayoutFileName[0])
             else:
                 fmmt.View(args.View[0])
         if args.Delete:

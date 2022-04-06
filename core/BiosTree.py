@@ -6,6 +6,7 @@
 ##
 import collections
 from PI.Common import *
+from utils.FmmtLogger import FmmtLogger as logger
 
 ROOT_TREE = 'ROOT'
 ROOT_FV_TREE = 'ROOT_FV_TREE'
@@ -95,7 +96,7 @@ class BIOSTREE:
                 nextTree.LastRel = None
             return DeleteTree
         else:
-            print('Could not find the target tree')
+            logger.error('Could not find the target tree')
             return None
 
     def FindNode(self, key: str, Findlist: list) -> None:

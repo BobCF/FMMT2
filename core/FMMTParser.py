@@ -9,6 +9,7 @@ from core.BinaryFactoryProduct import ParserEntry
 from core.BiosTreeNode import *
 from core.BiosTree import *
 from core.GuidTools import *
+from utils.FmmtLogger import FmmtLogger as logger
 
 class FMMTParser:
     def __init__(self, name: str, TYPE: str) -> None:
@@ -30,7 +31,7 @@ class FMMTParser:
     def Encapsulation(self, rootTree, CompressStatus: bool) -> None:
         # If current node is Root node, skip it.
         if rootTree.type == ROOT_TREE or rootTree.type == ROOT_FV_TREE or rootTree.type == ROOT_FFS_TREE or rootTree.type == ROOT_SECTION_TREE:
-            print('Start at Root !')
+            logger.debug('Encapsulated successfully!')
         # If current node do not have Header, just add Data.
         elif rootTree.type == BINARY_DATA or rootTree.type == FFS_FREE_SPACE:
             self.FinalData += rootTree.Data.Data

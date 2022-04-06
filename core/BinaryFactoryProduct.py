@@ -7,10 +7,12 @@
 from re import T
 import copy
 import os
+import sys
 from PI.Common import *
 from core.BiosTreeNode import *
 from core.BiosTree import *
-from core.GuidTools import *
+from core.GuidTools import GUIDTools
+from utils.FmmtLogger import FmmtLogger as logger
 
 ROOT_TREE = 'ROOT'
 ROOT_FV_TREE = 'ROOT_FV_TREE'
@@ -36,8 +38,11 @@ class BinaryFactory():
 
 class BinaryProduct():
     ## Use GuidTool to decompress data.
-    def DeCompressData(self, GuidTool, Section_Data: bytes) -> bytes:
+    def DeCompressData(self, GuidTool, Section_Data: bytes, FileName) -> bytes:
         guidtool = GUIDTools().__getitem__(struct2stream(GuidTool))
+        if not guidtool.ifexist:
+            logger.error("GuidTool {} is not found when decompressing {} file.\n".format(guidtool.command, FileName))
+            raise Exception("Process Failed: GuidTool not found!")
         DecompressedData = guidtool.unpack(Section_Data)
         return DecompressedData
 
@@ -78,7 +83,7 @@ class SectionProduct(BinaryProduct):
         elif Section_Tree.Data.Type == 0x02:
             Section_Tree.Data.OriData = Section_Tree.Data.Data
             DeCompressGuidTool = Section_Tree.Data.ExtHeader.SectionDefinitionGuid
-            Section_Tree.Data.Data = self.DeCompressData(DeCompressGuidTool, Section_Tree.Data.Data)
+            Section_Tree.Data.Data = self.DeCompressData(DeCompressGuidTool, Section_Tree.Data.Data, Section_Tree.Parent.Data.Name)
             Section_Tree.Data.Size = len(Section_Tree.Data.Data) + Section_Tree.Data.HeaderLength
             self.ParserSection(Section_Tree, b'')
         elif Section_Tree.Data.Type == 0x03:

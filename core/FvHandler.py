@@ -9,6 +9,7 @@ from core.BiosTree import *
 from core.GuidTools import GUIDTools
 from core.BiosTreeNode import *
 from PI.Common import *
+from utils.FmmtLogger import FmmtLogger as logger
 
 EFI_FVB2_ERASE_POLARITY = 0x00000800
 
@@ -217,6 +218,9 @@ class FvHandler:
             TargetTree.Data.Data = NewData
         if GuidTool:
             guidtool = GUIDTools().__getitem__(struct2stream(GuidTool))
+            if not guidtool.ifexist:
+                logger.error("GuidTool {} is not found when decompressing {} file.\n".format(guidtool.command, TargetTree.Parent.Data.Name))
+                raise Exception("Process Failed: GuidTool not found!")
             CompressedData = guidtool.pack(TargetTree.Data.Data)
             if len(CompressedData) < len(TargetTree.Data.OriData):
                 New_Pad_Size = GetPadSize(len(CompressedData), 4)
@@ -306,9 +310,10 @@ class FvHandler:
                     else:
                         ParTree.Data.Data += struct2stream(item.Data.Header) + item.Data.Data + item.Data.PadData
                 if ParTree.Data.Type == 0x02:
-                    ParPath = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
-                    ToolPath = os.path.join(os.path.dirname(ParPath), r'FMMTConfig.ini')
-                    guidtool = GUIDTools(ToolPath).__getitem__(struct2stream(ParTree.Data.ExtHeader.SectionDefinitionGuid))
+                    guidtool = GUIDTools().__getitem__(struct2stream(ParTree.Data.ExtHeader.SectionDefinitionGuid))
+                    if not guidtool.ifexist:
+                        logger.error("GuidTool {} is not found when decompressing {} file.\n".format(guidtool.command, ParTree.Parent.Data.Name))
+                        raise Exception("Process Failed: GuidTool not found!")
                     CompressedData = guidtool.pack(ParTree.Data.Data)
                     Needed_Space = len(CompressedData) - len(ParTree.Data.OriData)
                     ParTree.Data.OriData = CompressedData
@@ -342,6 +347,7 @@ class FvHandler:
             self.Status = True
 
     def ReplaceFfs(self) -> bool:
+        logger.debug('Start Replacing Process......')
         TargetFv = self.TargetFfs.Parent
         # If the Fv Header Attributes is EFI_FVB2_ERASE_POLARITY, Child Ffs Header State need be reversed.
         if TargetFv.Data.Header.Attributes & EFI_FVB2_ERASE_POLARITY:
@@ -433,9 +439,11 @@ class FvHandler:
             ModifyFvExtData(TargetFv)
             TargetFv.Data.ModCheckSum()
             self.CompressData(TargetFv)
+        logger.debug('Done!')
         return self.Status
 
     def AddFfs(self) -> bool:
+        logger.debug('Start Adding Process......')
         # NewFfs parsing will not calculate the PadSize, thus recalculate.
         self.NewFfs.Data.PadData = b'\xff' * GetPadSize(self.NewFfs.Data.Size, 8)
         if self.TargetFfs.type == FFS_FREE_SPACE:
@@ -537,9 +545,11 @@ class FvHandler:
                 ModifyFvExtData(TargetFv)
                 TargetFv.Data.ModCheckSum()
                 self.ModifyTest(TargetFv.Parent, TargetLen)
+        logger.debug('Done!')
         return self.Status
 
     def DeleteFfs(self) -> bool:
+        logger.debug('Start Deleting Process......')
         Delete_Ffs = self.TargetFfs
         Delete_Fv = Delete_Ffs.Parent
         Add_Free_Space = Delete_Ffs.Data.Size + len(Delete_Ffs.Data.PadData)
@@ -582,4 +592,5 @@ class FvHandler:
         Delete_Fv.Data.ModCheckSum()
         self.CompressData(Delete_Fv)
         self.Status = True
+        logger.debug('Done!')
         return self.Status
